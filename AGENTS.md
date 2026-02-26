@@ -72,70 +72,30 @@ aral/
 
 ## Data Model
 
-### Fact
+Models are defined in `pipeline/models/`. Key types:
 
-```python
-class ConfidenceLevel(str, Enum):
-    STATED = "stated"              # Explicitly said by narrator/GM
-    OBSERVED = "observed"          # Directly witnessed by PCs
-    CHARACTER_CLAIM = "character_claim"  # Stated by NPC (may be unreliable)
-    IMPLIED = "implied"            # Reasonably inferred from events
-    RUMOR = "rumor"                # Secondhand, hearsay
-    PLAYER_THEORY = "player_theory"  # Out-of-character speculation
-    UNCERTAIN = "uncertain"        # Ambiguous, possibly misunderstood
-    SUPERSEDED = "superseded"      # Contradicted by later info
+### Fact (`pipeline/models/fact.py`)
+- `subject_entity`: Primary entity this fact is about
+- `object_entities`: Other entities referenced
+- `text`: The fact content
+- `category`: Classification (history, abilities, geography, etc.)
+- `confidence`: ConfidenceLevel enum (stated, observed, character_claim, implied, rumor, player_theory, uncertain, superseded)
 
-class Fact(BaseModel):
-    subject_entity: str            # Canonical name of primary entity
-    object_entities: list[str] = []  # Other entities referenced
-    text: str                      # The fact itself
-    category: str                  # history, abilities, geography, etc.
-    confidence: ConfidenceLevel
-```
+### ExtractionResult (`pipeline/models/extraction.py`)
+- `session_number`, `extracted_at`, `registry_commit`, `extractor_version`: Metadata
+- `context_resolutions`: List of reference→entity mappings for this session
+- `entities`: New entities discovered
+- `facts`: Extracted facts
 
-### ExtractionResult
+### Registry (`pipeline/models/registry.py`)
+- `entities`: dict mapping entity_id → Entity
+- `alias_index`: Computed field mapping lowercase names → entity_id
+- `resolve(name)`: Look up entity_id by name/alias
+- `get_entity(entity_id)`: Retrieve an Entity
 
-```python
-class ExtractionResult(BaseModel):
-    session_number: int
-    extracted_at: datetime
-    registry_commit: str           # Git SHA of registry used
-    extractor_version: str
-    
-    context_resolutions: dict[str, str]  # "the mountain" -> "Mount Tambora"
-    entities: list[ExtractedEntity]
-    facts: list[Fact]
-```
-
-### Registry
-
-```python
-class Entity(BaseModel):
-    canonical_name: str
-    aliases: list[str]
-    type: str                      # person, location, object, organization, phenomenon
-    first_appearance: int          # Session number
-
-class Registry(BaseModel):
-    entities: dict[str, Entity]    # entity_id -> Entity
-    alias_index: dict[str, str]    # lowercase alias -> entity_id
-```
-
-### EntityData (aggregated)
-
-```python
-class EntityData(BaseModel):
-    entity_id: str
-    canonical_name: str
-    aliases: list[str]
-    type: str
-    first_appearance: int
-    
-    facts: list[AggregatedFact]    # Facts where this entity is subject
-    referenced_by: list[Reference]  # Facts from other entities mentioning this one
-    sessions_appeared: list[int]
-    last_updated: datetime
-```
+### EntityData (`pipeline/models/entity.py`)
+- Aggregated view of an entity for article rendering
+- Contains `facts`, `referenced_by`, `sessions_appeared`, `last_updated`
 
 ## Build System
 
@@ -292,6 +252,6 @@ Just use it. The `type` field isn't constrained to a fixed set.
 
 ### Add a new confidence category
 
-1. Add to `ConfidenceLevel` enum in `wiki/models/fact.py`
+1. Add to `ConfidenceLevel` enum in `pipeline/models/fact.py`
 2. Update extraction prompt to explain when to use it
 3. Update rendering prompt to handle it appropriately
