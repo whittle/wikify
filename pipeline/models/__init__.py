@@ -1,4 +1,4 @@
-"""Data models for the Aral wiki generator pipeline."""
+"""Data models for the Wikify pipeline."""
 
 from .entity import AggregatedFact, Entity, EntityData, Reference
 from .extraction import ContextResolution, ExtractedEntity, ExtractionResult

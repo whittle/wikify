@@ -1,6 +1,6 @@
-# CLAUDE.md - Aral Wiki Generator
+# Wikify
 
-This project extracts structured knowledge from RPG session notes and generates Wikipedia-style articles about the fictional world of Aral.
+A tool for extracting structured knowledge from notes and generating Wikipedia-style articles.
 
 ## Project Overview
 
@@ -14,7 +14,7 @@ All files are version-controlled. The build is managed by SCons.
 ## Repository Structure
 
 ```
-aral/
+wikify/
   pipeline/
     models/           # Pydantic data models
       fact.py         # Fact, ConfidenceLevel

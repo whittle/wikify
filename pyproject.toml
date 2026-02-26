@@ -1,5 +1,5 @@
 [project]
-name = "aral"
+name = "wikify"
 version = "0.1.0"
 description = "Extracts structured knowledge from RPG session notes and generates Wikipedia-style articles"
 readme = "README.md"
