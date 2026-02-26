@@ -1,0 +1,585 @@
+# RPG Session Notes → Wiki: Design Document
+
+A system for extracting structured knowledge from role-playing game session notes and generating Wikipedia-style articles about the fictional world.
+
+## The Problem
+
+Long-running tabletop RPG campaigns accumulate vast amounts of lore spread across dozens or hundreds of session notes. Players and GMs want to:
+
+- Look up facts about characters, locations, and events
+- Track what's known vs. suspected vs. rumored
+- See when information was learned (which session)
+- Maintain a living reference that grows with the campaign
+
+Manually maintaining a wiki is tedious and falls out of sync. This system uses LLMs to extract structured facts from session notes and mechanically aggregate them into entity-specific files that can be rendered as wiki articles.
+
+## Design Principles
+
+### Separation of Concerns
+
+The pipeline has three distinct phases with clear boundaries:
+
+1. **Extraction (LLM)**: Session notes → structured facts
+2. **Aggregation (mechanical)**: Collected facts → per-entity data files (deterministic, re-runnable)
+3. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
+
+This separation means:
+- Session extractions are immutable snapshots with full provenance
+- Entity files can be regenerated at any time from session files
+- Articles can be re-rendered with different styles without re-extraction
+
+### Facts as Source of Truth
+
+Rather than treating wiki articles as the source of truth (editing them in place), we store individual facts with full provenance. Articles are *generated views* of the fact database.
+
+This enables:
+- Querying facts directly ("what did we learn in sessions 20-30?")
+- Regenerating articles with different templates
+- Handling contradictions explicitly
+- Full auditability of where information came from
+
+### Version Control as Foundation
+
+All files — inputs, intermediate outputs, and final articles — live in a git repository. This provides:
+- History and rollback for non-deterministic LLM outputs
+- Collaboration and review workflows
+- Provenance tracking (each extraction records the registry commit it used)
+- First-class support for manual edits (just commit them with a message)
+
+### Incremental Updates
+
+The system is designed for ongoing campaigns. After each session:
+1. Extract facts from the new session
+2. Re-run aggregation (fast, mechanical)
+3. Regenerate affected articles
+
+No need to reprocess the entire corpus for routine updates.
+
+---
+
+## Data Model
+
+### Directory Structure
+
+```
+/wiki
+  /sessions/
+    /raw/                    # Original session notes (input)
+      session-001.txt
+      session-002.txt
+    /extracted/              # LLM-extracted facts
+      session-001.json
+      session-002.json
+  /entities/
+    /data/                   # Aggregated facts per entity (generated)
+      baron-aldric.json
+      thornwood.json
+    /articles/               # Wiki articles (generated)
+      baron-aldric.md
+      thornwood.md
+  entity-registry.json       # Master list of entities and aliases
+  SConstruct                 # Build configuration
+```
+
+### Session Extraction Format
+
+Each `/sessions/extracted/session-NNN.json`:
+
+```json
+{
+  "session_number": 12,
+  "extracted_at": "2025-02-25T14:30:00Z",
+  "registry_commit": "a1b2c3d4",
+  "extractor_version": "1.0.0",
+  
+  "context_resolutions": {
+    "the mountain": "Mount Tambora",
+    "the baron": "Baron Aldric"
+  },
+  
+  "entities": [
+    {
+      "canonical_name": "Baron Aldric",
+      "aliases": ["Aldric"],
+      "type": "person",
+      "is_new": false
+    },
+    {
+      "canonical_name": "The Sunken Library",
+      "aliases": [],
+      "type": "location",
+      "is_new": true
+    }
+  ],
+  
+  "facts": [
+    {
+      "subject_entity": "Baron Aldric",
+      "object_entities": ["King Aldren"],
+      "text": "Served as court wizard to King Aldren before his exile",
+      "category": "history",
+      "confidence": "stated"
+    },
+    {
+      "subject_entity": "Baron Aldric",
+      "object_entities": [],
+      "text": "Can cast illusions powerful enough to fool multiple people simultaneously",
+      "category": "abilities",
+      "confidence": "observed"
+    },
+    {
+      "subject_entity": "The Sunken Library",
+      "object_entities": ["Lake Veris"],
+      "text": "Located beneath Lake Veris, accessible only at low water",
+      "category": "geography",
+      "confidence": "stated"
+    }
+  ]
+}
+```
+
+The `registry_commit` field records which version of the entity registry was used for this extraction, enabling full provenance tracking.
+
+### Fact Schema
+
+Each fact has:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `subject_entity` | Yes | The canonical name of the entity this fact is primarily about |
+| `object_entities` | No | List of other canonical entity names referenced by the fact |
+| `text` | Yes | The fact itself, as a complete statement |
+| `category` | Yes | What aspect of the subject this describes |
+| `confidence` | Yes | How reliable this information is (see below) |
+
+### Confidence Categories
+
+| Label | Meaning | Example |
+|-------|---------|---------|
+| `stated` | Explicitly said by narrator/GM as true | "The Baron is 50 years old" |
+| `observed` | Directly witnessed by player characters | "The Baron cast a fireball" |
+| `character_claim` | Stated by an NPC (may be unreliable) | "The innkeeper says the Baron was framed" |
+| `implied` | Reasonably inferred from events | "The Baron knew the password, suggesting prior familiarity" |
+| `rumor` | Secondhand, hearsay, in-world reputation | "Villagers say the Baron murdered his brother" |
+| `player_theory` | Out-of-character player speculation | "The party suspects the Baron is planning to betray them" |
+| `uncertain` | Ambiguous, possibly misunderstood | "A figure matching the Baron's description was seen fleeing" |
+| `superseded` | Contradicted by later information | (Added during aggregation, not extraction) |
+
+These categories were chosen because they:
+1. Map to distinctions actually present in session notes (dialogue vs. narration vs. inference)
+2. Are reliably distinguishable by an LLM (unlike numerical confidence scores)
+3. Are useful for article generation (different phrasing for stated facts vs. rumors)
+4. Are appropriate for RPG contexts (GM narration, NPC dialogue, PC observation, town gossip, player theorizing)
+
+### Entity Registry Format
+
+`entity-registry.json`:
+
+```json
+{
+  "entities": {
+    "baron-aldric": {
+      "canonical_name": "Baron Aldric",
+      "aliases": ["Aldric", "Baron Aldric von Stein"],
+      "type": "person",
+      "first_appearance": 3
+    },
+    "thornwood": {
+      "canonical_name": "Thornwood",
+      "aliases": ["Thornwood Village"],
+      "type": "location",
+      "first_appearance": 1
+    }
+  },
+  "alias_index": {
+    "aldric": "baron-aldric",
+    "baron aldric": "baron-aldric",
+    "baron aldric von stein": "baron-aldric",
+    "thornwood": "thornwood",
+    "thornwood village": "thornwood"
+  }
+}
+```
+
+The `alias_index` is denormalized for fast lookups during aggregation.
+
+### Aggregated Entity Format
+
+Each `/entities/data/baron-aldric.json`:
+
+```json
+{
+  "entity_id": "baron-aldric",
+  "canonical_name": "Baron Aldric",
+  "aliases": ["Aldric", "Baron Aldric von Stein"],
+  "type": "person",
+  "first_appearance": 3,
+  
+  "facts": [
+    {
+      "text": "First appeared in Thornwood seeking mercenaries",
+      "category": "history",
+      "confidence": "stated",
+      "session": 3,
+      "object_entities": ["Thornwood"]
+    },
+    {
+      "text": "Served as court wizard to King Aldren before his exile",
+      "category": "history", 
+      "confidence": "stated",
+      "session": 12,
+      "object_entities": ["King Aldren"]
+    }
+  ],
+  
+  "referenced_by": [
+    {
+      "entity": "the-sunken-library",
+      "entity_name": "The Sunken Library",
+      "text": "Baron Aldric is searching for a tome hidden in the library",
+      "session": 12
+    }
+  ],
+  
+  "sessions_appeared": [3, 12, 15, 23],
+  "last_updated": "2025-02-25T14:35:00Z"
+}
+```
+
+The `referenced_by` section captures facts from *other* entities where this entity appears in `object_entities`. This enables bidirectional relationship discovery without duplicating facts.
+
+---
+
+## Build System
+
+The pipeline is managed by SCons, which handles dependency tracking and incremental rebuilds.
+
+### Why SCons?
+
+SCons was chosen over Make because:
+- Native Python — builders are Python functions, matching the rest of the tooling
+- Content-based change detection (MD5) rather than just timestamps
+- Better handling of dynamic dependencies through custom scanners
+- No need for a separate dependency-generation phase
+
+### Dependency Graph
+
+```
+                                    ┌──────────────────┐
+                                    │ entity-registry  │
+                                    │     (input)      │
+                                    └────────┬─────────┘
+                                             │
+         ┌───────────────────────────────────┼───────────────────────────────────┐
+         │                                   │                                   │
+         ▼                                   ▼                                   ▼
+┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
+│ session-001.txt │               │ session-002.txt │               │ session-003.txt │
+└────────┬────────┘               └────────┬────────┘               └────────┬────────┘
+         │                                 │                                 │
+         ▼                                 ▼                                 ▼
+┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
+│session-001.json │───────┐       │session-002.json │───────┐       │session-003.json │
+└─────────────────┘       │       └─────────────────┘       │       └─────────────────┘
+                          │                                 │                 │
+                          ▼                                 ▼                 ▼
+                    ┌─────────────────────────────────────────────────────────────┐
+                    │                    Aggregation (mechanical)                 │
+                    └──────────────────────────────┬──────────────────────────────┘
+                                                   │
+                    ┌──────────────────────────────┼──────────────────────────────┐
+                    │                              │                              │
+                    ▼                              ▼                              ▼
+          ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
+          │baron-aldric.json│            │  thornwood.json │            │king-aldren.json │
+          └────────┬────────┘            └────────┬────────┘            └────────┬────────┘
+                   │                              │                              │
+                   ▼                              ▼                              ▼
+          ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
+          │ baron-aldric.md │            │   thornwood.md  │            │  king-aldren.md │
+          └─────────────────┘            └─────────────────┘            └─────────────────┘
+```
+
+### The Registry Dependency
+
+Extraction requires the entity registry to resolve references to existing entities. This creates a potential circular dependency: extraction reads from the registry, but new entities discovered during extraction should be added to the registry.
+
+We break this cycle with the following rule:
+
+**Extraction can only run against a committed, clean registry.**
+
+Before extraction runs, the build system verifies that the working tree copy of `entity-registry.json` matches HEAD (no uncommitted changes). Each extraction output records the git commit SHA of the registry used.
+
+This approach:
+- Eliminates ambiguity about which registry version was used
+- Makes manual registry edits first-class (edit, commit with a message, then extract)
+- Enables provenance tracking across the entire history
+- Forces intentionality — you can't accidentally extract against a half-edited registry
+
+### Sequential Extraction
+
+Sessions must be extracted in order. Session N's extraction benefits from having entities discovered in sessions 1 through N-1 already in the registry.
+
+This means:
+- New session extraction is fast (just extract the new session)
+- Re-extraction of an old session doesn't *invalidate* later extractions (they remain valid snapshots)
+- Re-extraction is a choice driven by cost/benefit, not a dependency requirement
+
+### Build Targets
+
+| Builder | Input | Output | Notes |
+|---------|-------|--------|-------|
+| `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` | LLM call, sequential |
+| `AggregateEntity` | all relevant `session-*.json` | `entity-name.json` | Mechanical, parallel |
+| `RenderArticle` | `entity-name.json` | `entity-name.md` | LLM call, parallel |
+
+### Build Commands
+
+```bash
+# Normal workflow: extract new sessions, aggregate, render
+scons
+
+# Re-extract from a specific session onward (after registry improvements)
+scons extract --from=20
+
+# Re-extract everything (after prompt improvements)
+scons extract --all
+
+# Rebuild aggregation and articles only (no extraction)
+scons aggregate
+scons render
+```
+
+### When to Re-Extract
+
+Re-extraction is expensive because it requires a capable inference engine. It makes sense when:
+
+- You've manually corrected the registry (merged entities, fixed aliases) and want earlier sessions to benefit from better entity resolution
+- You've improved the extraction prompt
+- You've found errors in an extraction that need correction
+
+Note that re-extraction of session N doesn't *require* re-extraction of sessions before or after it. Each extraction is a valid snapshot relative to the registry version it used. Re-extraction is always an *opportunity* for improvement, not a *requirement* driven by dependency invalidation.
+
+---
+
+## Key Design Decisions
+
+### Why JSON Files Instead of a Database?
+
+Options considered:
+1. **JSON files** — Simple, human-readable, git-friendly
+2. **SQLite** — Query capability, handles scale, still portable
+3. **Hybrid** — SQLite for storage, JSON exports for LLM consumption
+
+We chose **JSON files** because:
+- Session extractions are write-once, read-many
+- The aggregation step is a full rebuild anyway
+- Git versioning provides history and collaboration
+- No dependencies beyond a JSON parser
+- Human-inspectable for debugging
+- Disk space is cheap
+
+The tradeoff is losing ad-hoc query capability, but for most campaigns (hundreds of entities, thousands of facts), full-scan is fast enough.
+
+### Why Not Unify Facts and Relationships?
+
+Early designs had a separate `relationships` array:
+
+```json
+"relationships": [
+  {
+    "entity_1": "Baron Aldric",
+    "entity_2": "King Aldren", 
+    "relationship": "served"
+  }
+]
+```
+
+This was rejected because:
+- It duplicates information already in facts
+- The relationship label ("served") loses nuance present in the fact text ("served as court wizard before his exile")
+- Multi-entity facts (A negotiated between B and C) are awkward to represent
+- Relationships are just facts that reference other entities
+
+Instead, facts have an optional `object_entities` list. Relationships emerge from queries: "find all facts where X is subject and Y is in object_entities."
+
+We also considered adding `relationship_type` labels to facts, but decided against it. The ontology we're generating isn't that structured, and the free-text fact captures nuance that labels would flatten.
+
+### Why Not Store Contextual Aliases?
+
+Session notes often use contextual references: "the mountain," "the baron," "the sword." These can't be stored as global aliases because they're session-scoped — "the mountain" means Mount Tambora in sessions 4-9 but might mean Mount Kira in sessions 30-35.
+
+Options considered:
+1. **Don't store contextual aliases** — Only store globally unambiguous aliases
+2. **Session-scoped resolution tables** — Store how contextual references resolved in each session
+3. **Scoped aliases in registry** — Store aliases with session-range metadata
+
+We chose **Option 2**: Each session extraction includes a `context_resolutions` block documenting how contextual references were resolved. This is for auditability only — all facts use canonical names, so aggregation remains unambiguous.
+
+The extraction prompt instructs the LLM to:
+- Resolve contextual references using session context
+- Output facts using only canonical entity names  
+- Only add aliases that would unambiguously identify this entity across the entire campaign
+
+### Why Natural Language Confidence Labels?
+
+Options considered:
+1. **Numerical scores (0-100)** — Maximum granularity
+2. **Natural language categories** — Discrete, meaningful buckets
+
+We chose **natural language categories** because LLMs don't have well-calibrated numerical probability estimates. When asked for confidence scores:
+- They cluster around arbitrary anchors (70, 80, 90)
+- They're inconsistent across runs
+- They provide false precision (what's the difference between 73 and 76?)
+
+Natural language categories map to distinctions the LLM can actually identify from text:
+- "A character explicitly stated this" — the LLM can identify dialogue
+- "This is implied by events" — the LLM can recognize inference
+- "This is speculation by characters" — the LLM can distinguish opinions from facts
+
+The categories are essentially a text classification task, which LLMs do reliably.
+
+### Handling New Entities
+
+When extraction identifies an entity not in the registry (`is_new: true`), two approaches were considered:
+
+**Auto-add**: Automatically add to registry. Faster, but risks creating duplicate entities for the same thing ("the Old Library" in session 8 might be the same as "the library" in session 12).
+
+**Queue for review**: Add to a pending list for human review. Safer for entity resolution.
+
+The recommended approach is to auto-add entities but periodically review the registry for duplicates that should be merged. Entity merging is straightforward: update the registry, re-run aggregation, and the facts automatically consolidate.
+
+### Handling Contradictions
+
+Information in RPGs gets retconned, misremembered, or deliberately falsified by NPCs. Rather than silently overwriting facts, the system preserves history:
+
+- Both facts are kept in the entity file
+- The older fact can be marked with `"superseded_by": <session_number>` during a manual review pass
+- The article generator can phrase contradictions narratively: "Originally believed to be from the Northern Kingdoms [S5], though later revealed to be Eldarian [S23]"
+
+---
+
+## Pipeline Details
+
+### Phase 1: Extraction
+
+**Input**: Raw session notes + entity registry
+
+**Process**: LLM extracts structured facts, resolving contextual references
+
+**Output**: Session extraction JSON file with provenance metadata
+
+The extraction prompt provides the current entity registry (canonical names and aliases) so the LLM can resolve references to existing entities. New entities are flagged with `is_new: true`.
+
+The extraction must run against a clean, committed registry. The output records:
+- `registry_commit`: Git SHA of the registry used
+- `extractor_version`: Version of the extraction prompt/tooling
+- `extracted_at`: Timestamp
+
+### Phase 2: Aggregation
+
+**Input**: All session extraction files + entity registry
+
+**Process**: Mechanical aggregation (no LLM)
+
+**Output**: Per-entity data files
+
+For each entity in the registry:
+1. Collect facts where `subject_entity` matches the canonical name
+2. Collect `referenced_by` entries from facts where this entity appears in `object_entities`
+3. Sort facts by session number
+4. Write entity data file
+
+This is fully deterministic and can be re-run any time. It's also fast — no LLM calls, just JSON parsing and restructuring.
+
+### Phase 3: Rendering
+
+**Input**: Entity data file
+
+**Process**: LLM generates wiki-style article
+
+**Output**: Markdown article with session citations
+
+The rendering prompt specifies:
+- Article structure and voice
+- Citation format (e.g., `[S12]` for session 12)
+- How to handle different confidence categories
+- Whether to include player theories
+
+Rendering is embarrassingly parallel — each entity can be rendered independently.
+
+---
+
+## Session Context Hints
+
+When session notes use ambiguous contextual references, you can prepend hints to help the extraction LLM:
+
+```
+[CONTEXT FOR THIS SESSION]
+This session takes place on Mount Tambora, referred to throughout as 
+"the mountain." The party is accompanied by Sera (the ranger from 
+session 5) and still carrying the Queensbane sword.
+
+[SESSION 7 NOTES BEGIN]
+We set off at dawn, making our way up the eastern slope...
+```
+
+Natural language hints work better than structured formats (like YAML front-matter) because:
+- They match the register of the session notes
+- They handle nuance ("the Baron appears in disguise as Corwin")
+- They don't require the LLM to switch parsing modes
+- You can be partial — only hint what's genuinely ambiguous
+
+---
+
+## Future Considerations
+
+### Entity Merging
+
+When two entities are discovered to be the same:
+1. Update registry: merge aliases, keep one canonical name
+2. Re-run aggregation (facts automatically consolidate under the surviving entity)
+3. Re-render affected articles
+
+No re-extraction required — the original extractions remain valid, and aggregation handles the merge.
+
+### Category Expansion
+
+The entity `type` field (person, location, object, organization, phenomenon) may need expansion. Add types as needed; the system doesn't depend on a fixed set.
+
+### Confidence Upgrades
+
+A fact might start as `player_theory` and later be confirmed as `stated`. This could be handled by:
+- Adding a new fact with higher confidence (both remain in history)
+- Manual annotation linking the theory to its confirmation
+- A `confirmed_by` field on theory facts
+
+### Player Theory Handling in Articles
+
+Player theories (`player_theory` confidence) can be:
+- **Included**: The wiki becomes a record of both world-state and party-state
+- **Excluded**: The wiki is strictly in-world encyclopedia
+- **Separate section**: Articles have a collapsible "Party Theories" section
+
+This is a rendering-time decision and doesn't affect extraction or storage.
+
+### Multi-Campaign Support
+
+For shared universes or multiple campaign timelines:
+
+```
+/wiki
+  /campaigns/
+    /campaign-a/
+      /sessions/
+      /entities/
+      entity-registry.json
+    /campaign-b/
+      /sessions/
+      /entities/
+      entity-registry.json
+  /shared/
+    entity-registry.json    # Cross-campaign entities
+```
+
+The shared registry could be referenced by campaign-specific extraction, enabling entities that appear in multiple campaigns to be tracked consistently.
