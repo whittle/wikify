@@ -15,7 +15,7 @@ All files are version-controlled. The build is managed by SCons.
 
 ```
 aral/
-  wiki/
+  pipeline/
     models/           # Pydantic data models
       fact.py         # Fact, ConfidenceLevel
       entity.py       # Entity, EntityData  
@@ -67,7 +67,6 @@ aral/
     entity-registry.json
   
   SConstruct
-  CLAUDE.md
   README.md
 ```
 
@@ -147,7 +146,7 @@ SCons manages the build. Key rules:
 Before extraction runs, verify `entity-registry.json` matches HEAD:
 
 ```python
-def verify_registry_clean() -> str:
+def get_registry_commit_sha("entity-registry.json") -> str:
     """Returns commit SHA if clean, raises if dirty or uncommitted."""
 ```
 
@@ -168,11 +167,11 @@ entity-*.json → entity-*.md (LLM)
 ### Build commands
 
 ```bash
-scons                    # Extract new sessions, aggregate, render
-scons extract --from=20  # Re-extract from session 20 onward
-scons extract --all      # Re-extract everything
-scons aggregate          # Rebuild aggregation only
-scons render             # Rebuild articles only
+scons extract --session=20        # Extract from session-20.txt
+scons aggregate                   # Rebuild aggregation only
+scons render                      # Rebuild dirty articles only
+scons render --article=thornwood  # Rebuild article even if not dirty
+scons --session=20                # Extract indicated session, aggregate, render as needed
 ```
 
 ## Testing Strategy
@@ -260,15 +259,15 @@ To merge entities or add aliases: edit `entity-registry.json`, commit with a mes
 - SCons
 - Pydantic
 - Anthropic Python SDK
+- pytest (testing)
 - Hypothesis (testing)
-- pytest
 
 ## Common Tasks
 
 ### Add a new session
 
 1. Add `data/sessions/raw/session-NNN.txt`
-2. Run `scons`
+2. Run `scons --session=NNN`
 
 ### Merge two entities
 
@@ -280,11 +279,11 @@ To merge entities or add aliases: edit `entity-registry.json`, commit with a mes
 ### Fix an extraction error
 
 1. Edit `data/sessions/extracted/session-NNN.json` directly, or
-2. Delete it and re-run `scons` to re-extract
+2. Delete it and re-run `scons --session=NNN` to re-extract
 
 ### Change the extraction prompt
 
-1. Edit `wiki/extraction/prompt.py`
+1. Edit `pipeline/extraction/prompt.py`
 2. Run `scons extract --all` to re-extract with new prompt
 
 ### Add a new entity type
