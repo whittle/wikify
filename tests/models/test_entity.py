@@ -2,10 +2,14 @@
 
 from datetime import datetime
 
-import pytest
-from pydantic import ValidationError
 
-from pipeline.models import AggregatedFact, ConfidenceLevel, Entity, EntityData, Reference
+from pipeline.models import (
+    AggregatedFact,
+    ConfidenceLevel,
+    Entity,
+    EntityData,
+    Reference,
+)
 
 
 class TestEntity:

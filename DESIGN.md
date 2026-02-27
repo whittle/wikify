@@ -109,12 +109,12 @@ Each `/sessions/extracted/session-NNN.json`:
   "extracted_at": "2025-02-25T14:30:00Z",
   "registry_commit": "a1b2c3d4",
   "extractor_version": "1.0.0",
-  
+
   "context_resolutions": {
     "the mountain": "Mount Tambora",
     "the baron": "Baron Aldric"
   },
-  
+
   "entities": [
     {
       "canonical_name": "Baron Aldric",
@@ -129,7 +129,7 @@ Each `/sessions/extracted/session-NNN.json`:
       "is_new": true
     }
   ],
-  
+
   "facts": [
     {
       "subject_entity": "Baron Aldric",
@@ -232,7 +232,7 @@ Each `/entities/data/baron-aldric.json`:
   "aliases": ["Aldric", "Baron Aldric von Stein"],
   "type": "person",
   "first_appearance": 3,
-  
+
   "facts": [
     {
       "text": "First appeared in Thornwood seeking mercenaries",
@@ -243,13 +243,13 @@ Each `/entities/data/baron-aldric.json`:
     },
     {
       "text": "Served as court wizard to King Aldren before his exile",
-      "category": "history", 
+      "category": "history",
       "confidence": "stated",
       "session": 12,
       "object_entities": ["King Aldren"]
     }
   ],
-  
+
   "referenced_by": [
     {
       "entity": "the-sunken-library",
@@ -258,7 +258,7 @@ Each `/entities/data/baron-aldric.json`:
       "session": 12
     }
   ],
-  
+
   "sessions_appeared": [3, 12, 15, 23],
   "last_updated": "2025-02-25T14:35:00Z"
 }
@@ -407,7 +407,7 @@ Early designs had a separate `relationships` array:
 "relationships": [
   {
     "entity_1": "Baron Aldric",
-    "entity_2": "King Aldren", 
+    "entity_2": "King Aldren",
     "relationship": "served"
   }
 ]
@@ -436,7 +436,7 @@ We chose **Option 2**: Each session extraction includes a `context_resolutions` 
 
 The extraction prompt instructs the LLM to:
 - Resolve contextual references using session context
-- Output facts using only canonical entity names  
+- Output facts using only canonical entity names
 - Only add aliases that would unambiguously identify this entity across the entire campaign
 
 ### Why Natural Language Confidence Labels?
@@ -534,8 +534,8 @@ When session notes use ambiguous contextual references, you can prepend hints to
 
 ```
 [CONTEXT FOR THIS SESSION]
-This session takes place on Mount Tambora, referred to throughout as 
-"the mountain." The party is accompanied by Sera (the ranger from 
+This session takes place on Mount Tambora, referred to throughout as
+"the mountain." The party is accompanied by Sera (the ranger from
 session 5) and still carrying the Queensbane sword.
 
 [SESSION 7 NOTES BEGIN]
