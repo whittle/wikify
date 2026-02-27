@@ -11,6 +11,40 @@ A pipeline that:
 
 All files are version-controlled. The build is managed by SCons.
 
+## Data Repository
+
+The `data/` directory is a git submodule pointing to a separate repository ([aral](https://github.com/whittle/aral)). This separates tool development from data processing:
+
+- **wikify repo**: Tool code, pipeline logic, tests
+- **aral repo**: Session notes, extractions, entity registry, rendered articles
+
+### Cloning
+
+```bash
+git clone --recursive git@github.com:whittle/wikify.git
+# Or if already cloned:
+git submodule update --init
+```
+
+### Commit workflow
+
+Data changes are committed in the submodule:
+
+```bash
+cd data
+git add entity-registry.json
+git commit -m "Add alias for Baron Aldric"
+git push
+```
+
+The parent repo can optionally track submodule updates:
+
+```bash
+cd ..
+git add data
+git commit -m "Update data submodule"
+```
+
 ## Repository Structure
 
 ```
@@ -18,34 +52,34 @@ wikify/
   pipeline/
     models/           # Pydantic data models
       fact.py         # Fact, ConfidenceLevel
-      entity.py       # Entity, EntityData  
+      entity.py       # Entity, EntityData
       extraction.py   # ExtractionResult, ContextResolution
       registry.py     # Registry, AliasIndex
-    
+
     extraction/       # Session → structured facts
       prompt.py       # build_extraction_prompt(session, registry) -> str
       parser.py       # parse_extraction_response(raw) -> ExtractionResult
       extract.py      # extract_session(session, registry, client) -> ExtractionResult
-    
+
     aggregation/      # Extractions → per-entity data
       aggregate.py    # aggregate_entity(entity_id, extractions, registry) -> EntityData
-    
+
     rendering/        # Entity data → markdown articles
       prompt.py       # build_render_prompt(entity_data) -> str
       parser.py       # parse_render_response(raw) -> str
       render.py       # render_article(entity_data, client) -> str
-    
+
     llm/              # LLM client abstraction
       client.py       # LLMClient protocol, AnthropicClient
-    
+
     git/              # Git integration
       registry.py     # verify_registry_clean() -> commit SHA or raises
-    
+
     builders/         # SCons builders
       extraction.py
       aggregation.py
       rendering.py
-  
+
   tests/
     conftest.py
     fixtures/
@@ -56,8 +90,8 @@ wikify/
     extraction/
     aggregation/
     rendering/
-  
-  data/
+
+  data/               # Git submodule (github.com/whittle/aral)
     sessions/
       raw/            # Input: session-001.txt, session-002.txt, ...
       extracted/      # Output: session-001.json, session-002.json, ...
@@ -65,7 +99,7 @@ wikify/
       data/           # Output: baron-aldric.json, ...
       articles/       # Output: baron-aldric.md, ...
     entity-registry.json
-  
+
   SConstruct
   README.md
 ```
@@ -159,7 +193,7 @@ Mock at the LLM boundary for integration tests:
 class MockLLMClient:
     def __init__(self, responses: dict[str, str]):
         self.responses = responses
-    
+
     def complete(self, prompt: str) -> str:
         # Return canned response based on prompt hash or pattern
 ```
@@ -181,8 +215,8 @@ When session notes have ambiguous references, prepend natural language context:
 
 ```
 [CONTEXT FOR THIS SESSION]
-This session takes place on Mount Tambora, referred to throughout as 
-"the mountain." The party is accompanied by Sera (the ranger from 
+This session takes place on Mount Tambora, referred to throughout as
+"the mountain." The party is accompanied by Sera (the ranger from
 session 5).
 
 [SESSION 7 NOTES BEGIN]

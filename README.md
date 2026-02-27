@@ -10,3 +10,11 @@ The original knowledge domain for this project is a long-running D&D game I’m
 playing with by brother Rogers and friend Thain. It’s Thain’s game, set in an
 original world he created called Aral. Rogers takes moment-by-moment notes of
 our adventures in Discord. Those session notes are then grist to the wiki mill.
+
+## Setup
+
+```bash
+git clone --recursive git@github.com:whittle/wikify.git
+cd wikify
+uv sync
+```

@@ -46,6 +46,24 @@ All files — inputs, intermediate outputs, and final articles — live in a git
 - Provenance tracking (each extraction records the registry commit it used)
 - First-class support for manual edits (just commit them with a message)
 
+### Separate Tool and Data Repositories
+
+The wikify tool and the campaign data live in separate git repositories. This separation ensures that commits have a single meaning:
+
+- **Tool repository (wikify)**: Code changes, prompt improvements, build system updates
+- **Data repository (aral)**: Session notes, extractions, registry edits, rendered articles
+
+Without this separation, the commit history mixes unrelated concerns—a code refactor appears alongside a session extraction, making it harder to understand the evolution of either.
+
+The `registry_commit` field in extractions references the data repository's history, providing accurate provenance tracking independent of tool version.
+
+**Current implementation**: The data repository is mounted as a git submodule at `data/`. This is a temporary measure that simplifies development by keeping both repos in a single working directory.
+
+**Future direction**: The tool should support a configurable reference to an external data repository (via environment variable, CLI argument, or config file). This would allow:
+- Using the same wikify installation with multiple campaigns
+- Deploying wikify as a standalone tool without bundled data
+- Cleaner separation with no submodule complexity
+
 ### Incremental Updates
 
 The system is designed for ongoing campaigns. After each session:
