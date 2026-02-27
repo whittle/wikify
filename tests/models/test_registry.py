@@ -2,7 +2,7 @@
 
 import json
 
-from pipeline.models import Entity, Registry
+from wikify.models import Entity, Registry
 
 
 class TestRegistry:

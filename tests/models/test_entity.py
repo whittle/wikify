@@ -3,7 +3,7 @@
 from datetime import datetime
 
 
-from pipeline.models import (
+from wikify.models import (
     AggregatedFact,
     ConfidenceLevel,
     Entity,

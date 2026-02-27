@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pipeline.models import ConfidenceLevel, Fact
+from wikify.models import ConfidenceLevel, Fact
 
 
 class TestConfidenceLevel:

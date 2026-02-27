@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pipeline.models import (
+from wikify.models import (
     ConfidenceLevel,
     ContextResolution,
     ExtractedEntity,

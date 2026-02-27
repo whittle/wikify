@@ -49,7 +49,7 @@ git commit -m "Update data submodule"
 
 ```
 wikify/
-  pipeline/
+  wikify/
     models/           # Pydantic data models
       fact.py         # Fact, ConfidenceLevel
       entity.py       # Entity, EntityData
@@ -106,28 +106,28 @@ wikify/
 
 ## Data Model
 
-Models are defined in `pipeline/models/`. Key types:
+Models are defined in `wikify/models/`. Key types:
 
-### Fact (`pipeline/models/fact.py`)
+### Fact (`wikify/models/fact.py`)
 - `subject_entity`: Primary entity this fact is about
 - `object_entities`: Other entities referenced
 - `text`: The fact content
 - `category`: Classification (history, abilities, geography, etc.)
 - `confidence`: ConfidenceLevel enum (stated, observed, character_claim, implied, rumor, player_theory, uncertain, superseded)
 
-### ExtractionResult (`pipeline/models/extraction.py`)
+### ExtractionResult (`wikify/models/extraction.py`)
 - `session_number`, `extracted_at`, `registry_commit`, `extractor_version`: Metadata
 - `context_resolutions`: List of reference→entity mappings for this session
 - `entities`: New entities discovered
 - `facts`: Extracted facts
 
-### Registry (`pipeline/models/registry.py`)
+### Registry (`wikify/models/registry.py`)
 - `entities`: dict mapping entity_id → Entity
 - `alias_index`: Computed field mapping lowercase names → entity_id
 - `resolve(name)`: Look up entity_id by name/alias
 - `get_entity(entity_id)`: Retrieve an Entity
 
-### EntityData (`pipeline/models/entity.py`)
+### EntityData (`wikify/models/entity.py`)
 - Aggregated view of an entity for article rendering
 - Contains `facts`, `referenced_by`, `sessions_appeared`, `last_updated`
 
@@ -294,7 +294,7 @@ Hooks configured in `.pre-commit-config.yaml`:
 
 ### Change the extraction prompt
 
-1. Edit `pipeline/extraction/prompt.py`
+1. Edit `wikify/extraction/prompt.py`
 2. Run `scons extract --all` to re-extract with new prompt
 
 ### Add a new entity type
@@ -303,6 +303,6 @@ Just use it. The `type` field isn't constrained to a fixed set.
 
 ### Add a new confidence category
 
-1. Add to `ConfidenceLevel` enum in `pipeline/models/fact.py`
+1. Add to `ConfidenceLevel` enum in `wikify/models/fact.py`
 2. Update extraction prompt to explain when to use it
 3. Update rendering prompt to handle it appropriately
