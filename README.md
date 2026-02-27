@@ -22,3 +22,31 @@ git clone --recursive git@github.com:whittle/wikify.git
 cd wikify
 uv sync
 ```
+
+If you already cloned without `--recursive`:
+
+```bash
+git submodule update --init
+```
+
+## Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality. The hooks run automatically on `git commit`, but you can also run them manually:
+
+```bash
+pre-commit run          # Run on staged files
+pre-commit run --all    # Run on all files (use when updating hooks)
+```
+
+The following checks must pass before committing:
+
+- **trailing-whitespace**: Remove trailing whitespace
+- **end-of-file-fixer**: Ensure files end with a newline
+- **check-yaml**: Validate YAML syntax
+- **check-added-large-files**: Prevent large files from being committed
+- **uv-lock**: Keep uv.lock in sync
+- **uv-export**: Keep requirements exports in sync
+- **ruff-check**: Lint Python code (with auto-fix)
+- **ruff-format**: Format Python code
+- **ty-check**: Type check with ty
+- **pytest**: Run the test suite

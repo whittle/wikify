@@ -140,8 +140,8 @@ SCons manages the build. Key rules:
 Before extraction runs, verify `entity-registry.json` matches HEAD:
 
 ```python
-def get_registry_commit_sha("entity-registry.json") -> str:
-    """Returns commit SHA if clean, raises if dirty or uncommitted."""
+def get_data_repo_commit_sha("entity-registry.json") -> str:
+    """Returns commit SHA of data repo if clean, raises if dirty or uncommitted."""
 ```
 
 Each extraction records the registry commit in its output.
@@ -255,6 +255,23 @@ To merge entities or add aliases: edit `entity-registry.json`, commit with a mes
 - Anthropic Python SDK
 - pytest (testing)
 - Hypothesis (testing)
+
+## Pre-commit Hooks
+
+All commits must pass pre-commit hooks. Run `pre-commit run` before committing to check staged files. When updating the pre-commit hooks themselves (`.pre-commit-config.yaml`), run `pre-commit run --all` to verify all files pass.
+
+Hooks configured in `.pre-commit-config.yaml`:
+
+- **trailing-whitespace**: Remove trailing whitespace
+- **end-of-file-fixer**: Ensure files end with a newline
+- **check-yaml**: Validate YAML syntax
+- **check-added-large-files**: Prevent large files from being committed
+- **uv-lock**: Keep uv.lock in sync
+- **uv-export**: Keep requirements exports in sync
+- **ruff-check**: Lint Python code (with auto-fix)
+- **ruff-format**: Format Python code
+- **ty-check**: Type check with ty (`uv run ty check`)
+- **pytest**: Run the test suite (`uv run python -m pytest`)
 
 ## Common Tasks
 
