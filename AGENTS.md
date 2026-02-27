@@ -170,6 +170,23 @@ scons --session=20                # Extract indicated session, aggregate, render
 
 ## Testing Strategy
 
+### What makes a test valuable
+
+A test is valuable if it can fail when the code is wrong. Do not write tests that:
+
+- **Test the framework**: Pydantic guarantees that models can be instantiated, fields return what was assigned, defaults match the schema, and serialization roundtrips. Don't test these.
+- **Mirror the implementation**: `assert entity.name == "foo"` after setting `name="foo"` tests nothing—it cannot fail unless Python itself is broken.
+- **Test type checking**: If the type checker verifies a property (e.g., `ConfidenceLevel` values are strings because it inherits from `str`), don't write a runtime test for it.
+
+A test is valuable when it verifies:
+
+- **Computed behavior**: The `alias_index` is derived from entities—test that the derivation is correct.
+- **Invariants across inputs**: Use property tests to verify that behavior holds for arbitrary valid inputs, not just one example.
+- **Edge cases in logic**: Empty inputs, boundary conditions, error handling.
+- **Integration contracts**: Parsing external formats, API responses, file formats with real-world quirks.
+
+When writing model tests, ask: "What logic does this model contain beyond its schema?" If the answer is "none," the model likely needs no dedicated tests—the type checker and Pydantic's guarantees suffice.
+
 ### Aggregation (deterministic)
 
 Full unit tests and property-based tests with Hypothesis:
