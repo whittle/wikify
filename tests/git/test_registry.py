@@ -11,24 +11,9 @@ import pytest
 
 from wikify.git import (
     DirtyRegistryError,
-    get_data_repo_path,
     get_head_sha,
     is_file_clean,
 )
-
-
-class TestGetDataRepoPath:
-    """Tests for get_data_repo_path."""
-
-    def test_returns_path(self) -> None:
-        """Should return a Path object."""
-        result = get_data_repo_path()
-        assert isinstance(result, Path)
-
-    def test_path_ends_with_data(self) -> None:
-        """Should return path ending in 'data'."""
-        result = get_data_repo_path()
-        assert result.name == "data"
 
 
 class TestIsFileClean:
