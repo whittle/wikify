@@ -15,3 +15,8 @@ dev = [
     "pytest",
     "hypothesis",
 ]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.19",
+]

@@ -75,13 +75,13 @@ class TestFact:
             "category": "abilities",
             "confidence": "character_claim",
         }
-        fact = Fact(**data)
+        fact = Fact.model_validate(data)
         assert fact.confidence == ConfidenceLevel.CHARACTER_CLAIM
 
     def test_fact_requires_subject_entity(self):
         """Fact must have a subject_entity."""
         with pytest.raises(ValidationError):
-            Fact(
+            Fact(  # type: ignore[call-arg]
                 text="Some fact without a subject.",
                 category="misc",
                 confidence=ConfidenceLevel.UNCERTAIN,
@@ -90,7 +90,7 @@ class TestFact:
     def test_fact_requires_text(self):
         """Fact must have text content."""
         with pytest.raises(ValidationError):
-            Fact(
+            Fact(  # type: ignore[call-arg]
                 subject_entity="Someone",
                 category="misc",
                 confidence=ConfidenceLevel.UNCERTAIN,
@@ -103,5 +103,5 @@ class TestFact:
                 subject_entity="Someone",
                 text="Some fact.",
                 category="misc",
-                confidence="invalid_level",
+                confidence="invalid_level",  # type: ignore[arg-type]
             )

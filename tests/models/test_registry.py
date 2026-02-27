@@ -123,7 +123,7 @@ class TestRegistry:
                 }
             }
         }
-        registry = Registry(**json_data)
+        registry = Registry.model_validate(json_data)
         # Alias index is rebuilt from entities
         assert registry.resolve("sera") == "sera"
         assert registry.resolve("the ranger") == "sera"

@@ -3,6 +3,7 @@
 from typing import Protocol
 
 import anthropic
+from anthropic.types import TextBlock
 
 
 class LLMClient(Protocol):
@@ -34,7 +35,7 @@ class AnthropicClient:
         )
         # Extract text from the response
         content = message.content[0]
-        if hasattr(content, "text"):
+        if isinstance(content, TextBlock):
             return content.text
         raise ValueError(f"Unexpected content type: {type(content)}")
 
