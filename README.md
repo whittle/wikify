@@ -11,6 +11,10 @@ playing with by brother Rogers and friend Thain. It’s Thain’s game, set in a
 original world he created called Aral. Rogers takes moment-by-moment notes of
 our adventures in Discord. Those session notes are then grist to the wiki mill.
 
+Currently, this is a toy application to scratch a personal itch. Once I get it
+working, I’m also interested in using it as a testbed for practical discovery of
+what models are sufficient to this use case.
+
 ## Setup
 
 ```bash
