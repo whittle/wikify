@@ -1,0 +1,86 @@
+"""SCons builder for session extraction."""
+
+import re
+from pathlib import Path
+from typing import Any
+
+from wikify.extraction import extract_session
+from wikify.git.registry import get_data_repo_path
+from wikify.llm.client import AnthropicClient
+from wikify.models.registry import Registry
+
+
+def parse_session_number(filename: str) -> int:
+    """Extract session number from filename like 'session-020.txt'.
+
+    Args:
+        filename: The filename to parse
+
+    Returns:
+        The session number as an integer
+
+    Raises:
+        ValueError: If the filename doesn't match expected pattern
+    """
+    match = re.match(r"session-(\d+)\.txt$", filename)
+    if not match:
+        raise ValueError(f"Invalid session filename: {filename}")
+    return int(match.group(1))
+
+
+def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
+    """SCons action to extract a session.
+
+    Args:
+        target: List of target nodes (output JSON file)
+        source: List of source nodes (input session text file)
+        env: SCons environment
+
+    Returns:
+        0 on success, non-zero on failure
+    """
+    source_path = Path(str(source[0]))
+    target_path = Path(str(target[0]))
+
+    # Parse session number from filename
+    session_number = parse_session_number(source_path.name)
+
+    # Read session text
+    session_text = source_path.read_text()
+
+    # Load registry
+    registry_path = get_data_repo_path() / "entity-registry.json"
+    if registry_path.exists():
+        registry = Registry.model_validate_json(registry_path.read_text())
+    else:
+        registry = Registry()
+
+    # Create LLM client and extract
+    client = AnthropicClient()
+    result = extract_session(session_text, session_number, registry, client)
+
+    # Write output
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(result.model_dump_json(indent=2))
+
+    return 0
+
+
+def create_extraction_builder(env: Any) -> Any:
+    """Create and return the extraction Builder.
+
+    Args:
+        env: SCons environment
+
+    Returns:
+        An SCons Builder configured for extraction
+    """
+    # Import SCons here to avoid import at module level
+    # This allows the module to be imported without SCons installed (for testing)
+    from SCons.Script import Builder
+
+    return Builder(
+        action=extract_action,
+        suffix=".json",
+        src_suffix=".txt",
+    )

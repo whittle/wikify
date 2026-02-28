@@ -221,3 +221,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Created by https://gitignore.org
+# SCons.gitignore
+
+# for projects that use SCons for building: http://http://www.scons.org/
+.sconsign.dblite
+
+# When configure fails, SCons outputs these
+config.log
+.sconf_temp
