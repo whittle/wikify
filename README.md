@@ -29,6 +29,18 @@ If you already cloned without `--recursive`:
 git submodule update --init
 ```
 
+## Configuration
+
+### Anthropic API Key
+
+The extraction and rendering stages use Claude via the Anthropic API. Set your API key as an environment variable:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-xxxxx"
+```
+
+You can add this to your shell profile (`~/.zshrc`), a `.env` file, or use [direnv](https://direnv.net/) with a `.envrc` file. Never commit API keys to version control.
+
 ## Pre-commit Hooks
 
 This project uses pre-commit hooks to ensure code quality. The hooks run automatically on `git commit`, but you can also run them manually:
