@@ -1,9 +1,14 @@
 """LLM client abstraction for the pipeline."""
 
+import logging
+import tempfile
 from typing import Protocol
 
 import anthropic
 from anthropic.types import TextBlock
+from wikify.config import Config, global_config
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient(Protocol):
@@ -19,25 +24,46 @@ class AnthropicClient:
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-5-20250929",
-        max_tokens: int = 4096,
+        config: Config = global_config,
     ) -> None:
+        self.config = config
         self.client = anthropic.Anthropic()
-        self.model = model
-        self.max_tokens = max_tokens
 
     def complete(self, prompt: str) -> str:
         """Generate a completion using Claude."""
+        if self.config.llm_file_logging:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                prefix="llm_prompt_",
+                suffix=".txt",
+                delete=False,
+            ) as f:
+                f.write(prompt)
+                logger.info(f"LLM prompt saved to: {f.name}")
+
         message = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
+            model=self.config.model,
+            max_tokens=self.config.max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
         # Extract text from the response
         content = message.content[0]
         if isinstance(content, TextBlock):
-            return content.text
-        raise ValueError(f"Unexpected content type: {type(content)}")
+            response = content.text
+        else:
+            raise ValueError(f"Unexpected content type: {type(content)}")
+
+        if self.config.llm_file_logging:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                prefix="llm_response_",
+                suffix=".txt",
+                delete=False,
+            ) as f:
+                f.write(response)
+                logger.info(f"LLM response saved to: {f.name}")
+
+        return response
 
 
 class MockLLMClient:

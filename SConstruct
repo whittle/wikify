@@ -5,11 +5,14 @@ import sys
 # Add project root to path for imports
 sys.path.insert(0, Dir(".").abspath)
 
-from wikify.builders.extraction import create_extraction_builder
-from wikify.git.registry import get_data_repo_path
+from wikify.scons import (
+     create_extraction_builder,
+     get_data_repo_path,
+     init_wikify,
+)
 
-# Create environment and register builders
 env = Environment()
+init_wikify(env.Dictionary(as_dict=True))
 env.Append(BUILDERS={"Extract": create_extraction_builder(env)})
 
 # Command-line options
