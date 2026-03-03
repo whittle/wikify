@@ -1,6 +1,7 @@
 """Parser for LLM extraction responses."""
 
 import json
+import re
 from json import JSONDecodeError
 
 from pydantic import BaseModel, ValidationError
@@ -9,6 +10,19 @@ from wikify.models.extraction import ContextResolution
 from wikify.models.fact import Fact
 
 from .errors import InvalidJSONError, SchemaValidationError
+
+
+def _strip_code_fences(raw: str) -> str:
+    """Strip markdown code fences from LLM response.
+
+    Handles responses wrapped in ```json ... ``` or ``` ... ```.
+    """
+    # Match ```json or ``` at start, and ``` at end
+    pattern = r"^```(?:json)?\s*\n?(.*?)\n?```\s*$"
+    match = re.match(pattern, raw.strip(), re.DOTALL)
+    if match:
+        return match.group(1)
+    return raw
 
 
 class RawExtractedEntity(BaseModel):
@@ -32,7 +46,7 @@ def parse_extraction_response(raw: str) -> ParsedExtraction:
     """Parse LLM JSON response into structured extraction data.
 
     Args:
-        raw: Raw JSON string from LLM
+        raw: Raw JSON string from LLM (may include markdown code fences)
 
     Returns:
         ParsedExtraction containing context_resolutions, entities, and facts
@@ -41,8 +55,11 @@ def parse_extraction_response(raw: str) -> ParsedExtraction:
         InvalidJSONError: If the response is not valid JSON
         SchemaValidationError: If the JSON doesn't match expected schema
     """
+    # Strip markdown code fences if present
+    cleaned = _strip_code_fences(raw)
+
     try:
-        data = json.loads(raw)
+        data = json.loads(cleaned)
     except JSONDecodeError as e:
         raise InvalidJSONError(raw, str(e)) from e
 

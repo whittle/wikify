@@ -16,7 +16,9 @@ class InvalidJSONError(ExtractionParseError):
 
     def __init__(self, raw: str, json_error: str) -> None:
         self.json_error = json_error
-        super().__init__(raw, f"Invalid JSON: {json_error}")
+        # Include truncated raw content in message for debugging
+        preview = raw[:200] + "..." if len(raw) > 200 else raw
+        super().__init__(raw, f"Invalid JSON: {json_error}\nReceived: {preview!r}")
 
 
 class SchemaValidationError(ExtractionParseError):
