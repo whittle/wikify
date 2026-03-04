@@ -64,23 +64,3 @@ def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
     target_path.write_text(result.model_dump_json(indent=2))
 
     return 0
-
-
-def create_extraction_builder(env: Any) -> Any:
-    """Create and return the extraction Builder.
-
-    Args:
-        env: SCons environment
-
-    Returns:
-        An SCons Builder configured for extraction
-    """
-    # Import SCons here to avoid import at module level
-    # This allows the module to be imported without SCons installed (for testing)
-    from SCons.Script import Builder
-
-    return Builder(
-        action=extract_action,
-        suffix=".json",
-        src_suffix=".txt",
-    )

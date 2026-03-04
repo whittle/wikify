@@ -1,5 +1,3 @@
-"""SCons builders for the wikify pipeline."""
+from .extraction import extract_action
 
-from .extraction import create_extraction_builder
-
-__all__ = ["create_extraction_builder"]
+__all__ = ["extract_action"]
