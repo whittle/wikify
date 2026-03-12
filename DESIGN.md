@@ -17,15 +17,17 @@ Manually maintaining a wiki is tedious and falls out of sync. This system uses L
 
 ### Separation of Concerns
 
-The pipeline has three distinct phases with clear boundaries:
+The pipeline has four distinct phases with clear boundaries:
 
 1. **Extraction (LLM)**: Session notes → structured facts
-2. **Aggregation (mechanical)**: Collected facts → per-entity data files (deterministic, re-runnable)
-3. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
+2. **Split (mechanical)**: Extraction → per-entity-per-session data files
+3. **Merge (mechanical)**: Entity-session files → per-entity data files
+4. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
 
 This separation means:
 - Session extractions are immutable snapshots with full provenance
-- Entity files can be regenerated at any time from session files
+- Entity-session files capture each entity's data from one session
+- Entity data files can be regenerated at any time by merging entity-session files
 - Articles can be re-rendered with different styles without re-extraction
 
 ### Facts as Source of Truth
@@ -89,6 +91,13 @@ No need to reprocess the entire corpus for routine updates.
       session-001.json
       session-002.json
   /entities/
+    /sessions/               # Per-entity-per-session data (generated)
+      /session-001/
+        baron-aldric.json
+        thornwood.json
+      /session-002/
+        baron-aldric.json
+        the-sunken-library.json
     /data/                   # Aggregated facts per entity (generated)
       baron-aldric.json
       thornwood.json
@@ -297,25 +306,31 @@ SCons was chosen over Make because:
          │                                 │                                 │
          ▼                                 ▼                                 ▼
 ┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
-│session-001.json │───────┐       │session-002.json │───────┐       │session-003.json │
-└─────────────────┘       │       └─────────────────┘       │       └─────────────────┘
-                          │                                 │                 │
-                          ▼                                 ▼                 ▼
-                    ┌─────────────────────────────────────────────────────────────┐
-                    │                    Aggregation (mechanical)                 │
-                    └──────────────────────────────┬──────────────────────────────┘
-                                                   │
-                    ┌──────────────────────────────┼──────────────────────────────┐
-                    │                              │                              │
-                    ▼                              ▼                              ▼
-          ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
-          │baron-aldric.json│            │  thornwood.json │            │king-aldren.json │
-          └────────┬────────┘            └────────┬────────┘            └────────┬────────┘
-                   │                              │                              │
-                   ▼                              ▼                              ▼
-          ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
-          │ baron-aldric.md │            │   thornwood.md  │            │  king-aldren.md │
-          └─────────────────┘            └─────────────────┘            └─────────────────┘
+│session-001.json │               │session-002.json │               │session-003.json │
+└────────┬────────┘               └────────┬────────┘               └────────┬────────┘
+         │                                 │                                 │
+         ▼                                 ▼                                 ▼
+┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
+│ entities/       │               │ entities/       │               │ entities/       │
+│ sessions/       │               │ sessions/       │               │ sessions/       │
+│ session-001/    │               │ session-002/    │               │ session-003/    │
+│   *.json        │               │   *.json        │               │   *.json        │
+└────────┬────────┘               └────────┬────────┘               └────────┬────────┘
+         │                                 │                                 │
+         └─────────────────────────────────┼─────────────────────────────────┘
+                                           │
+                    ┌──────────────────────┼──────────────────────┐
+                    │                      │                      │
+                    ▼                      ▼                      ▼
+          ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+          │ entities/data/  │    │ entities/data/  │    │ entities/data/  │
+          │ baron-aldric    │    │ thornwood.json  │    │ king-aldren     │
+          └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+                   │                      │                      │
+                   ▼                      ▼                      ▼
+          ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+          │ baron-aldric.md │    │  thornwood.md   │    │ king-aldren.md  │
+          └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ### The Registry Dependency
@@ -348,7 +363,8 @@ This means:
 | Builder | Input | Output | Notes |
 |---------|-------|--------|-------|
 | `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` | LLM call, sequential |
-| `AggregateEntity` | all relevant `session-*.json` | `entity-name.json` | Mechanical, parallel |
+| `SplitSession` | `session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, one per extraction |
+| `MergeEntity` | `entities/sessions/*/entity-id.json` | `entities/data/entity-id.json` | Mechanical, parallel |
 | `RenderArticle` | `entity-name.json` | `entity-name.md` | LLM call, parallel |
 
 ### Build Commands
@@ -494,21 +510,40 @@ The extraction must run against a clean, committed registry. The output records:
 - `extractor_version`: Version of the extraction prompt/tooling
 - `extracted_at`: Timestamp
 
-### Phase 2: Aggregation
+### Phase 2a: Split
 
-**Input**: All session extraction files + entity registry
+**Input**: Session extraction file
 
-**Process**: Mechanical aggregation (no LLM)
+**Process**: Mechanical split (no LLM)
 
-**Output**: Per-entity data files
+**Output**: Per-entity-per-session data files in `entities/sessions/session-NNN/`
+
+For each entity in the extraction:
+1. Collect facts where `subject_entity` matches the entity
+2. Collect `referenced_by` entries from facts where this entity appears in `object_entities`
+3. Write entity-session file as `entities/sessions/session-NNN/{entity-id}.json`
+
+Each entity-session file contains an `EntityData` object representing what is known about that entity from that single session.
+
+### Phase 2b: Merge
+
+**Input**: All entity-session files for a given entity
+
+**Process**: Mechanical merge (no LLM)
+
+**Output**: Per-entity data file in `entities/data/`
 
 For each entity in the registry:
-1. Collect facts where `subject_entity` matches the canonical name
-2. Collect `referenced_by` entries from facts where this entity appears in `object_entities`
-3. Sort facts by session number
-4. Write entity data file
+1. Collect all `entities/sessions/*/entity-id.json` files
+2. Merge facts, references, and session lists
+3. Write merged entity data file
 
-This is fully deterministic and can be re-run any time. It's also fast — no LLM calls, just JSON parsing and restructuring.
+Both phases are fully deterministic and can be re-run any time. They're also fast — no LLM calls, just JSON parsing and restructuring.
+
+The split/merge separation provides:
+- **Granular intermediate artifacts**: Each entity-session file is inspectable
+- **Explicit dependencies**: The build system tracks which sessions contribute to each entity
+- **Easier debugging**: Trace any fact back to its specific session file
 
 ### Phase 3: Rendering
 

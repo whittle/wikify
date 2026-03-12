@@ -6,8 +6,9 @@ A tool for extracting structured knowledge from notes and generating Wikipedia-s
 
 A pipeline that:
 1. **Extracts** facts from session notes using an LLM
-2. **Aggregates** facts into per-entity data files (mechanical, no LLM)
-3. **Renders** entity data into wiki articles using an LLM
+2. **Splits** extractions into per-entity-per-session data files (mechanical)
+3. **Merges** entity-session files into per-entity data files (mechanical)
+4. **Renders** entity data into wiki articles using an LLM
 
 All files are version-controlled. The build is managed by SCons.
 
@@ -61,8 +62,9 @@ wikify/
       parser.py       # parse_extraction_response(raw) -> ExtractionResult
       extract.py      # extract_session(session, registry, client) -> ExtractionResult
 
-    aggregation/      # Extractions → per-entity data
-      aggregate.py    # aggregate_entity(entity_id, extractions, registry) -> EntityData
+    aggregation/      # Extractions → per-entity data (two-step process)
+      split.py        # split_session(extraction) -> writes entity-session files
+      merge.py        # merge_entity(entity_id, session_dir) -> EntityData
 
     rendering/        # Entity data → markdown articles
       prompt.py       # build_render_prompt(entity_data) -> str
@@ -96,6 +98,9 @@ wikify/
       raw/            # Input: session-001.txt, session-002.txt, ...
       extracted/      # Output: session-001.json, session-002.json, ...
     entities/
+      sessions/       # Intermediate: per-entity-per-session data
+        session-001/  #   baron-aldric.json, thornwood.json, ...
+        session-002/  #   ...
       data/           # Output: baron-aldric.json, ...
       articles/       # Output: baron-aldric.md, ...
     entity-registry.json
@@ -153,9 +158,10 @@ Sessions must be extracted in order. Session N benefits from entities discovered
 ### Dependency flow
 
 ```
-session-NNN.txt + registry → session-NNN.json (LLM)
-all session-*.json → entity-*.json (mechanical)
-entity-*.json → entity-*.md (LLM)
+session-NNN.txt + registry → session-NNN.json (LLM extraction)
+session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split)
+entities/sessions/*/entity-id.json → entities/data/entity-id.json (mechanical merge)
+entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ```
 
 ### Build commands
