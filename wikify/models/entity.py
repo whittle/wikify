@@ -1,7 +1,5 @@
 """Entity and EntityData models."""
 
-from datetime import datetime
-
 from pydantic import BaseModel
 
 from .fact import ConfidenceLevel
@@ -22,7 +20,7 @@ class AggregatedFact(BaseModel):
     text: str
     category: str
     confidence: ConfidenceLevel
-    object_entities: list[str] = []
+    object_entities: list[str]
     source_session: int
 
 
@@ -39,11 +37,10 @@ class EntityData(BaseModel):
 
     entity_id: str
     canonical_name: str
-    aliases: list[str] = []
+    aliases: list[str]
     type: str
     first_appearance: int
 
-    facts: list[AggregatedFact] = []  # Facts where this entity is subject
-    referenced_by: list[Reference] = []  # Facts from other entities mentioning this
-    sessions_appeared: list[int] = []
-    last_updated: datetime
+    facts: list[AggregatedFact]  # Facts where this entity is subject
+    referenced_by: list[Reference]  # Facts from other entities mentioning this
+    sessions_appeared: list[int]

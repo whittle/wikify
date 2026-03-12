@@ -32,6 +32,6 @@ class ExtractionResult(BaseModel):
     registry_commit: str  # Git SHA of registry used
     extractor_version: str
 
-    context_resolutions: list[ContextResolution] = []
-    entities: list[ExtractedEntity] = []
-    facts: list[Fact] = []
+    context_resolutions: list[ContextResolution]
+    entities: list[ExtractedEntity]
+    facts: list[Fact]
