@@ -167,11 +167,11 @@ entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ### Build commands
 
 ```bash
-scons extract --session=20        # Extract from session-20.txt
-scons aggregate                   # Rebuild aggregation only
-scons render                      # Rebuild dirty articles only
-scons render --article=thornwood  # Rebuild article even if not dirty
-scons --session=20                # Extract indicated session, aggregate, render as needed
+uv run python -m SCons extract --session=20        # Extract from session-20.txt
+uv run python -m SCons aggregate                   # Rebuild aggregation only
+uv run python -m SCons render                      # Rebuild dirty articles only
+uv run python -m SCons render --article=thornwood  # Rebuild article even if not dirty
+uv run python -m SCons --session=20                # Extract indicated session, aggregate, render as needed
 ```
 
 ## Testing Strategy

@@ -41,6 +41,14 @@ export ANTHROPIC_API_KEY="sk-ant-xxxxx"
 
 You can add this to your shell profile (`~/.zshrc`), a `.env` file, or use [direnv](https://direnv.net/) with a `.envrc` file. Never commit API keys to version control.
 
+## Running
+
+This project uses SCons to track dependencies. To run SCons:
+
+``` bash
+uv run python -m SCons
+```
+
 ## Pre-commit Hooks
 
 This project uses pre-commit hooks to ensure code quality. The hooks run automatically on `git commit`, but you can also run them manually:
