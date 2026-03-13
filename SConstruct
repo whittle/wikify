@@ -33,6 +33,22 @@ AddOption(
 )
 
 
+def discover_extracted_sessions(extracted_dir: Path) -> list[tuple[int, Path]]:
+    """Find all extracted session JSON files.
+
+    Returns:
+        List of (session_number, path) tuples, sorted by session number.
+    """
+    import re
+
+    sessions = []
+    for f in extracted_dir.glob("session-*.json"):
+        match = re.match(r"session-(\d+)\.json$", f.name)
+        if match:
+            sessions.append((int(match.group(1)), f))
+    return sorted(sessions)
+
+
 def discover_entity_sources(sessions_dir: Path) -> dict[str, list[Path]]:
     """Discover all entity JSON files across session splits.
 
@@ -83,7 +99,18 @@ if session_num:
     split = env.Split(str(split_marker), str(extraction_target))
     env.Depends(split, extraction)
 
+# Create split targets for all extracted sessions
+extracted_dir = data_path / "sessions" / "extracted"
+if extracted_dir.exists():
+    for num, extraction_path in discover_extracted_sessions(extracted_dir):
+        # Skip if this session was already set up via --session
+        if session_num and num == session_num:
+            continue
+        split_marker = sessions_dir / f"session-{num:03d}" / ".split_complete"
+        env.Split(str(split_marker), str(extraction_path))
+
 # Always set up merge targets for existing split outputs
+all_merge_targets = []
 if sessions_dir.exists():
     entity_sources = discover_entity_sources(sessions_dir)
     for entity_id, source_files in entity_sources.items():
@@ -91,9 +118,13 @@ if sessions_dir.exists():
         source_strs = [str(f) for f in source_files]
 
         merge = env.Merge(str(merge_target), source_strs)
+        all_merge_targets.append(merge)
 
         # Merge depends on all split marker files for sessions that have this entity
         for source_file in source_files:
             marker = source_file.parent / ".split_complete"
             if marker.exists():
                 env.Depends(merge, str(marker))
+
+# Named targets
+env.Alias("aggregate", all_merge_targets)
