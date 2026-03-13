@@ -100,6 +100,7 @@ if session_num:
     env.Depends(split, extraction)
 
 # Create split targets for all extracted sessions
+all_split_targets = []
 extracted_dir = data_path / "sessions" / "extracted"
 if extracted_dir.exists():
     for num, extraction_path in discover_extracted_sessions(extracted_dir):
@@ -107,7 +108,8 @@ if extracted_dir.exists():
         if session_num and num == session_num:
             continue
         split_marker = sessions_dir / f"session-{num:03d}" / ".split_complete"
-        env.Split(str(split_marker), str(extraction_path))
+        split = env.Split(str(split_marker), str(extraction_path))
+        all_split_targets.append(split)
 
 # Always set up merge targets for existing split outputs
 all_merge_targets = []
@@ -127,4 +129,4 @@ if sessions_dir.exists():
                 env.Depends(merge, str(marker))
 
 # Named targets
-env.Alias("aggregate", all_merge_targets)
+env.Alias("aggregate", all_split_targets + all_merge_targets)
