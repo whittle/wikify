@@ -21,8 +21,8 @@ class ConfidenceLevel(str, Enum):
 class Fact(BaseModel):
     """A single fact extracted from session notes."""
 
-    subject_entity: str  # Canonical name of primary entity
-    object_entities: list[str] = []  # Other entities referenced
+    subject_entity: str  # entity_id of primary entity
+    object_entities: list[str] = []  # entity_ids of other entities referenced
     text: str  # The fact itself
     category: str  # history, abilities, geography, etc.
     confidence: ConfidenceLevel

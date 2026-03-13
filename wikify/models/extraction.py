@@ -8,10 +8,10 @@ from .fact import Fact
 
 
 class ContextResolution(BaseModel):
-    """Maps a contextual reference to a canonical entity."""
+    """Maps a contextual reference to an entity_id."""
 
     reference: str  # e.g., "the mountain"
-    resolved_to: str  # e.g., "Mount Tambora"
+    resolved_to: str  # entity_id, e.g., "mount-tambora"
 
 
 class ExtractedEntity(BaseModel):

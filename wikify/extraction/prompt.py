@@ -20,6 +20,7 @@ You are a fact extractor for a tabletop RPG knowledge base. Your task is to \
 extract structured facts from session notes.
 
 {known_entities_section}
+
 ## Output Format
 
 Return a JSON object with these fields:
@@ -27,7 +28,7 @@ Return a JSON object with these fields:
 ```json
 {{
   "context_resolutions": [
-    {{"reference": "the mountain", "resolved_to": "Mount Tambora"}}
+    {{"reference": "the mountain", "resolved_to": "mount-tambora"}}
   ],
   "entities": [
     {{
@@ -39,8 +40,8 @@ Return a JSON object with these fields:
   ],
   "facts": [
     {{
-      "subject_entity": "Baron Aldric",
-      "object_entities": ["Thornwood Keep"],
+      "subject_entity": "baron-aldric",
+      "object_entities": ["thornwood-keep"],
       "text": "Baron Aldric rules Thornwood Keep.",
       "category": "governance",
       "confidence": "stated"
@@ -52,7 +53,7 @@ Return a JSON object with these fields:
 ### Field Definitions
 
 **context_resolutions**: Document how contextual references (like "the mountain" or \
-"the old man") are resolved to canonical entity names for this session.
+"the old man") are resolved to entity_ids for this session.
 
 **entities**: Only include NEW entities discovered in this session that are not in \
 the known entities list above. Each entity needs:
@@ -62,8 +63,8 @@ the known entities list above. Each entity needs:
 - `type`: one of person, location, object, organization, phenomenon, or similar
 
 **facts**: Extracted facts. Each fact needs:
-- `subject_entity`: canonical name of the primary entity this fact is about
-- `object_entities`: list of other entity names referenced in this fact
+- `subject_entity`: entity_id of the primary entity this fact is about
+- `object_entities`: list of entity_ids for other entities referenced in this fact
 - `text`: the fact itself, written as a complete statement
 - `category`: type of fact (history, abilities, geography, relationships, governance, \
 events, etc.)
@@ -80,7 +81,7 @@ events, etc.)
 ## Guidelines
 
 1. Extract all meaningful facts, even small details
-2. Use canonical entity names from the known entities list when possible
+2. Use entity_ids from the known entities list when referencing entities in facts
 3. Create new entities only for significant characters, places, or things
 4. Be precise about confidence levels - don't upgrade rumors to stated facts
 5. Include object_entities for any entities mentioned in the fact
@@ -103,6 +104,8 @@ def _build_known_entities_section(registry: Registry) -> str:
         aliases_str = ""
         if entity.aliases:
             aliases_str = f" (aliases: {', '.join(entity.aliases)})"
-        lines.append(f"- **{entity.canonical_name}**{aliases_str} [{entity.type}]")
+        lines.append(
+            f"- `{entity_id}`: **{entity.canonical_name}**{aliases_str} [{entity.type}]"
+        )
 
     return "\n".join(lines)
