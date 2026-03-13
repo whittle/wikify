@@ -1,5 +1,6 @@
 """Prompt builder for fact extraction."""
 
+from wikify.models.entity import Entity
 from wikify.models.registry import Registry
 
 
@@ -18,6 +19,8 @@ def build_extraction_prompt(session: str, registry: Registry) -> str:
     return f"""\
 You are a fact extractor for a tabletop RPG knowledge base. Your task is to \
 extract structured facts from session notes.
+
+## Known Entities
 
 {known_entities_section}
 
@@ -94,18 +97,23 @@ events, etc.)
 Return only the JSON object, no additional text."""
 
 
+def _stringify_known_entity(entity_id: str, entity: Entity) -> str:
+    """Markdown list item representation of an Entity."""
+    aliases_str = ""
+    if entity.aliases:
+        aliases_str = f" (aliases: {', '.join(entity.aliases)})"
+
+    return f"- `{entity_id}`: **{entity.canonical_name}**{aliases_str} [{entity.type}]"
+
+
 def _build_known_entities_section(registry: Registry) -> str:
     """Build the known entities section of the prompt."""
     if not registry.entities:
-        return "## Known Entities\n\nNo entities are known yet."
+        return "No entities are known yet."
 
-    lines = ["## Known Entities\n"]
-    for entity_id, entity in registry.entities.items():
-        aliases_str = ""
-        if entity.aliases:
-            aliases_str = f" (aliases: {', '.join(entity.aliases)})"
-        lines.append(
-            f"- `{entity_id}`: **{entity.canonical_name}**{aliases_str} [{entity.type}]"
-        )
+    lines = [
+        _stringify_known_entity(entity_id, entity)
+        for entity_id, entity in registry.entities.items()
+    ]
 
     return "\n".join(lines)
