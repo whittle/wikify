@@ -6,8 +6,10 @@ from typing import Any
 
 from wikify.aggregation.merge import merge_entity_data
 from wikify.aggregation.split import all_entity_data_for_session
-from wikify.models.entity import EntityData
+from wikify.git.registry import get_data_repo_path
+from wikify.models.entity import Entity, EntityData
 from wikify.models.extraction import ExtractionResult
+from wikify.models.registry import Registry
 
 
 def parse_session_number_from_json(filename: str) -> int:
@@ -88,5 +90,46 @@ def merge_action(target: list[Any], source: list[Any], env: Any) -> int:
     # Write output
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(merged.model_dump_json(indent=2))
+
+    return 0
+
+
+def register_action(target: list[Any], source: list[Any], env: Any) -> int:
+    """SCons action to register entities from an extraction into the registry.
+
+    Args:
+        target: List of target nodes (marker file .register_complete)
+        source: List of source nodes (input extraction JSON file)
+        env: SCons environment
+
+    Returns:
+        0 on success, non-zero on failure
+    """
+    source_path = Path(str(source[0]))
+    target_path = Path(str(target[0]))
+
+    extraction = ExtractionResult.model_validate_json(source_path.read_text())
+
+    if extraction.entities:
+        registry_path = get_data_repo_path() / "entity-registry.json"
+        if registry_path.exists():
+            registry = Registry.model_validate_json(registry_path.read_text())
+        else:
+            registry = Registry()
+
+        for extracted in extraction.entities:
+            entity = Entity(
+                canonical_name=extracted.canonical_name,
+                aliases=extracted.aliases,
+                type=extracted.type,
+                first_appearance=extracted.first_appearance,
+            )
+            registry.merge_entity(extracted.entity_id, entity)
+
+        registry_path.write_text(registry.model_dump_json(indent=2) + "\n")
+
+    # Write marker file
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text("")
 
     return 0

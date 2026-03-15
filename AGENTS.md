@@ -7,8 +7,9 @@ A tool for extracting structured knowledge from notes and generating Wikipedia-s
 A pipeline that:
 1. **Extracts** facts from session notes using an LLM
 2. **Splits** extractions into per-entity-per-session data files (mechanical)
-3. **Merges** entity-session files into per-entity data files (mechanical)
-4. **Renders** entity data into wiki articles using an LLM
+3. **Registers** newly discovered entities into the registry (mechanical)
+4. **Merges** entity-session files into per-entity data files (mechanical)
+5. **Renders** entity data into wiki articles using an LLM
 
 All files are version-controlled. The build is managed by SCons.
 
@@ -131,6 +132,7 @@ Models are defined in `wikify/models/`. Key types:
 - `alias_index`: Computed field mapping lowercase names → entity_id
 - `resolve(name)`: Look up entity_id by name/alias
 - `get_entity(entity_id)`: Retrieve an Entity
+- `merge_entity(entity_id, entity)`: Add or merge an entity (union aliases, min first_appearance)
 
 ### EntityData (`wikify/models/entity.py`)
 - Aggregated view of an entity for article rendering
@@ -160,9 +162,15 @@ Sessions must be extracted in order. Session N benefits from entities discovered
 ```
 session-NNN.txt + registry → session-NNN.json (LLM extraction)
 session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split)
+session-NNN.json → entity-registry.json (mechanical register, updates with discovered entities)
 entities/sessions/*/entity-id.json → entities/data/entity-id.json (mechanical merge)
 entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ```
+
+The register step merges newly discovered and changed entities from extractions
+into the registry. This enables "Session N benefits from entities discovered in
+sessions 1 through N-1" by automatically updating the registry with each
+extraction's discoveries.
 
 ### Build commands
 

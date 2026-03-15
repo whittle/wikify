@@ -3,7 +3,7 @@ from typing import Any
 
 from SCons.Script import Builder
 
-from .builders.aggregation import merge_action, split_action
+from .builders.aggregation import merge_action, register_action, split_action
 from .builders.extraction import extract_action
 from .config import global_config
 from .git.registry import get_data_repo_path
@@ -58,9 +58,24 @@ def create_merge_builder(env: Any) -> Any:
     )
 
 
+def create_register_builder(env: Any) -> Any:
+    """Create and return the register Builder.
+
+    Args:
+        env: SCons environment
+
+    Returns:
+        An SCons Builder configured for registering entities
+    """
+    return Builder(
+        action=register_action,
+    )
+
+
 __all__ = [
     "create_extraction_builder",
     "create_merge_builder",
+    "create_register_builder",
     "create_split_builder",
     "get_data_repo_path",
     "init_wikify",

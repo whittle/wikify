@@ -10,6 +10,7 @@ sys.path.insert(0, Dir(".").abspath)
 from wikify.scons import (
     create_extraction_builder,
     create_merge_builder,
+    create_register_builder,
     create_split_builder,
     get_data_repo_path,
     init_wikify,
@@ -17,9 +18,11 @@ from wikify.scons import (
 
 env = Environment()
 init_wikify(env.Dictionary(as_dict=True))
+
 env.Append(BUILDERS={
     "Extract": create_extraction_builder(env),
     "Split": create_split_builder(env),
+    "Register": create_register_builder(env),
     "Merge": create_merge_builder(env),
 })
 
@@ -99,8 +102,14 @@ if session_num:
     split = env.Split(str(split_marker), str(extraction_target))
     env.Depends(split, extraction)
 
-# Create split targets for all extracted sessions
+    # Register (depends on extraction)
+    register_marker = sessions_dir / f"session-{session_num:03d}" / ".register_complete"
+    register = env.Register(str(register_marker), str(extraction_target))
+    env.Depends(register, extraction)
+
+# Create split and register targets for all extracted sessions
 all_split_targets = []
+all_register_targets = []
 extracted_dir = data_path / "sessions" / "extracted"
 if extracted_dir.exists():
     for num, extraction_path in discover_extracted_sessions(extracted_dir):
@@ -110,6 +119,10 @@ if extracted_dir.exists():
         split_marker = sessions_dir / f"session-{num:03d}" / ".split_complete"
         split = env.Split(str(split_marker), str(extraction_path))
         all_split_targets.append(split)
+
+        register_marker = sessions_dir / f"session-{num:03d}" / ".register_complete"
+        register = env.Register(str(register_marker), str(extraction_path))
+        all_register_targets.append(register)
 
 # Always set up merge targets for existing split outputs
 all_merge_targets = []
@@ -129,4 +142,4 @@ if sessions_dir.exists():
                 env.Depends(merge, str(marker))
 
 # Named targets
-env.Alias("aggregate", all_split_targets + all_merge_targets)
+env.Alias("aggregate", all_split_targets + all_register_targets + all_merge_targets)

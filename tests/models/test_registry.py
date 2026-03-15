@@ -102,3 +102,166 @@ class TestRegistry:
         )
 
         assert registry.get_entity(entity_id) is None
+
+
+class TestMergeEntity:
+    def test_merge_new_entity(self):
+        """Merging a new entity adds it to the registry."""
+        registry = Registry()
+        entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=["The Baron"],
+            type="person",
+            first_appearance=1,
+        )
+
+        registry.merge_entity("baron-aldric", entity)
+
+        assert "baron-aldric" in registry.entities
+        assert registry.entities["baron-aldric"] == entity
+
+    def test_merge_updates_canonical_name(self):
+        """Merging updates canonical_name to the new value."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Baron Aldric",
+                    aliases=[],
+                    type="person",
+                    first_appearance=1,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Lord Aldric",
+            aliases=[],
+            type="person",
+            first_appearance=2,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        result = registry.entities["baron-aldric"]
+        assert result.canonical_name == "Lord Aldric"
+        # Old canonical name becomes an alias
+        assert "Baron Aldric" in result.aliases
+
+    def test_merge_unions_aliases(self):
+        """Merging unions existing and new aliases."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Baron Aldric",
+                    aliases=["The Baron", "Aldric"],
+                    type="person",
+                    first_appearance=1,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=["Lord of the Realm", "Aldric"],
+            type="person",
+            first_appearance=2,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        result = registry.entities["baron-aldric"]
+        assert set(result.aliases) == {"The Baron", "Aldric", "Lord of the Realm"}
+
+    def test_merge_excludes_new_canonical_from_aliases(self):
+        """Merging excludes the new canonical_name from aliases."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Aldric",
+                    aliases=["Baron Aldric"],
+                    type="person",
+                    first_appearance=1,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=[],
+            type="person",
+            first_appearance=2,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        result = registry.entities["baron-aldric"]
+        assert result.canonical_name == "Baron Aldric"
+        assert "Baron Aldric" not in result.aliases
+        assert "Aldric" in result.aliases
+
+    def test_merge_uses_minimum_first_appearance(self):
+        """Merging uses the minimum first_appearance."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Baron Aldric",
+                    aliases=[],
+                    type="person",
+                    first_appearance=5,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=[],
+            type="person",
+            first_appearance=3,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        assert registry.entities["baron-aldric"].first_appearance == 3
+
+    def test_merge_uses_new_type(self):
+        """Merging uses the new entity’s type."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Baron Aldric",
+                    aliases=[],
+                    type="person",
+                    first_appearance=1,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=[],
+            type="noble",
+            first_appearance=2,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        assert registry.entities["baron-aldric"].type == "noble"
+
+    def test_merge_sorts_aliases(self):
+        """Merged aliases are sorted."""
+        registry = Registry(
+            entities={
+                "baron-aldric": Entity(
+                    canonical_name="Baron Aldric",
+                    aliases=["Zebra", "Alpha"],
+                    type="person",
+                    first_appearance=1,
+                )
+            }
+        )
+        new_entity = Entity(
+            canonical_name="Baron Aldric",
+            aliases=["Middle", "Beta"],
+            type="person",
+            first_appearance=2,
+        )
+
+        registry.merge_entity("baron-aldric", new_entity)
+
+        result = registry.entities["baron-aldric"]
+        assert result.aliases == sorted(result.aliases)
