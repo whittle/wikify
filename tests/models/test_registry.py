@@ -1,8 +1,15 @@
 """Tests for the Registry model."""
 
+import copy
+
 from hypothesis import given, strategies as st
 
 from wikify.models import Entity, Registry
+
+
+def normalize_entity(entity: Entity) -> Entity:
+    entity.aliases = list(set(entity.aliases) - {entity.canonical_name})
+    return entity
 
 
 class TestRegistry:
@@ -118,70 +125,88 @@ class TestRegistry:
 
 
 class TestMergeEntity:
-    def test_merge_new_entity(self):
+    @given(st.builds(Registry), st.data())
+    def test_merge_new_entity(self, registry, data):
         """Merging a new entity adds it to the registry."""
-        registry = Registry()
-        entity = Entity(
-            canonical_name="Baron Aldric",
-            aliases=["The Baron"],
-            type="person",
-            first_appearance=1,
-        )
+        entity = data.draw(st.builds(Entity).map(normalize_entity))
+        entity_id = data.draw(st.text().filter(lambda a: a not in registry.entities))
 
-        registry.merge_entity("baron-aldric", entity)
+        result = registry.merge_entity(entity_id, entity)
 
-        assert "baron-aldric" in registry.entities
-        assert registry.entities["baron-aldric"] == entity
+        assert entity_id in registry.entities
+        assert result == registry.entities[entity_id] == entity
 
-    def test_merge_updates_canonical_name(self):
+    @given(st.dictionaries(st.text(), st.builds(Entity), min_size=1), st.data())
+    def test_merge_updates_canonical_name(self, entities, data):
         """Merging updates canonical_name to the new value."""
-        registry = Registry(
-            entities={
-                "baron-aldric": Entity(
-                    canonical_name="Baron Aldric",
-                    aliases=[],
-                    type="person",
-                    first_appearance=1,
-                )
-            }
+        registry = Registry(entities=entities)
+        entity_id = data.draw(st.sampled_from(sorted(entities.keys())))
+        new_canonical_name = data.draw(st.text())
+        entity = copy.replace(entities[entity_id], canonical_name=new_canonical_name)
+
+        result = registry.merge_entity(entity_id, entity)
+
+        assert result.canonical_name == new_canonical_name
+
+    @given(st.data())
+    def test_merge_old_canonical_name_becomes_alias(self, data):
+        """A merge that updates canonical_name adds the old value to aliases.."""
+        entities = data.draw(
+            st.dictionaries(
+                st.text(), st.builds(Entity).map(normalize_entity), min_size=1
+            )
         )
-        new_entity = Entity(
-            canonical_name="Lord Aldric",
-            aliases=[],
-            type="person",
-            first_appearance=2,
+        registry = Registry(entities=entities)
+        entity_id = data.draw(st.sampled_from(sorted(entities.keys())))
+        old_canonical_name = entities[entity_id].canonical_name
+        new_canonical_name = data.draw(
+            st.text().filter(lambda s: s != old_canonical_name)
         )
+        entity = copy.replace(entities[entity_id], canonical_name=new_canonical_name)
 
-        registry.merge_entity("baron-aldric", new_entity)
+        result = registry.merge_entity(entity_id, entity)
 
-        result = registry.entities["baron-aldric"]
-        assert result.canonical_name == "Lord Aldric"
-        # Old canonical name becomes an alias
-        assert "Baron Aldric" in result.aliases
+        assert old_canonical_name in result.aliases
 
-    def test_merge_unions_aliases(self):
-        """Merging unions existing and new aliases."""
-        registry = Registry(
-            entities={
-                "baron-aldric": Entity(
-                    canonical_name="Baron Aldric",
-                    aliases=["The Baron", "Aldric"],
-                    type="person",
-                    first_appearance=1,
-                )
-            }
+    @given(st.data())
+    def test_merge_preserves_old_aliases(self, data):
+        """Merging includes existing aliases."""
+        entities = data.draw(
+            st.dictionaries(
+                st.text(), st.builds(Entity).map(normalize_entity), min_size=1
+            )
         )
-        new_entity = Entity(
-            canonical_name="Baron Aldric",
-            aliases=["Lord of the Realm", "Aldric"],
-            type="person",
-            first_appearance=2,
+        registry = Registry(entities=entities)
+        entity_id = data.draw(st.sampled_from(sorted(entities.keys())))
+        old_entity = entities[entity_id]
+        new_aliases = data.draw(
+            st.lists(st.text().filter(lambda s: s != old_entity.canonical_name))
         )
+        new_entity = copy.replace(entities[entity_id], aliases=new_aliases)
 
-        registry.merge_entity("baron-aldric", new_entity)
+        result = registry.merge_entity(entity_id, new_entity)
 
-        result = registry.entities["baron-aldric"]
-        assert set(result.aliases) == {"The Baron", "Aldric", "Lord of the Realm"}
+        assert set(result.aliases) >= set(old_entity.aliases)
+
+    @given(st.data())
+    def test_merge_adds_new_aliases(self, data):
+        """Merging includes new aliases."""
+        entities = data.draw(
+            st.dictionaries(
+                st.text(), st.builds(Entity).map(normalize_entity), min_size=1
+            )
+        )
+        registry = Registry(entities=entities)
+        entity_id = data.draw(st.sampled_from(sorted(entities.keys())))
+        old_entity = entities[entity_id]
+        new_aliases = data.draw(
+            st.lists(st.text().filter(lambda s: s != old_entity.canonical_name))
+        )
+        new_entity = copy.replace(entities[entity_id], aliases=new_aliases)
+
+        result = registry.merge_entity(entity_id, new_entity)
+
+        assert set(result.aliases) >= set(new_aliases)
 
     def test_merge_excludes_new_canonical_from_aliases(self):
         """Merging excludes the new canonical_name from aliases."""
