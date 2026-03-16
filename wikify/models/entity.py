@@ -13,6 +13,35 @@ class Entity(BaseModel):
     type: str  # person, location, object, organization, phenomenon
     first_appearance: int  # Session number
 
+    def merge(self, other: Entity) -> Entity:
+        """Creates a new entity that is the result of merging other on top of self.
+
+        Precondition: other represents a more recent extraction of the same
+        entity. Both self and other have been normalized.
+
+        Merge each field using the appropriate strategy:
+        - canonical_name: uses other (more recent) value
+        - aliases: union of existing + other, excluding new canonical_name
+        - type: uses other (more recent) value
+        - first_appearance: minimum of existing and other
+
+        Postcondition: Does not alter self.
+
+        """
+        all_aliases = set(self.aliases) | set(other.aliases)
+
+        # Old canonical name becomes an alias if different
+        if self.canonical_name != other.canonical_name:
+            all_aliases.add(self.canonical_name)
+        all_aliases.discard(other.canonical_name)
+
+        return Entity(
+            canonical_name=other.canonical_name,
+            aliases=sorted(all_aliases),
+            type=other.type,
+            first_appearance=min(self.first_appearance, other.first_appearance),
+        )
+
 
 class AggregatedFact(BaseModel):
     """A fact with source session information."""

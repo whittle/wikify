@@ -46,19 +46,8 @@ class Registry(BaseModel):
             self.entities[entity_id] = entity
             return entity
 
-        existing = self.entities[entity_id]
-        all_aliases = set(existing.aliases) | set(entity.aliases)
-        # Old canonical name becomes an alias if different
-        if existing.canonical_name != entity.canonical_name:
-            all_aliases.add(existing.canonical_name)
-        all_aliases.discard(entity.canonical_name)
-
-        new_entity = Entity(
-            canonical_name=entity.canonical_name,
-            aliases=sorted(all_aliases),
-            type=entity.type,
-            first_appearance=min(existing.first_appearance, entity.first_appearance),
-        )
-
+        old_entity = self.entities[entity_id]
+        new_entity = old_entity.merge(entity)
         self.entities[entity_id] = new_entity
+
         return new_entity
