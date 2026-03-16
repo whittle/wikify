@@ -35,8 +35,21 @@ class TestRegistry:
         st.dictionaries(st.text(min_size=1), st.builds(Entity), min_size=1)
         .filter(
             lambda entities: (
-                len(entities)
-                == len({e.canonical_name.lower() for e in entities.values()})
+                # All names (canonical + aliases) must be unique across all entities
+                len(
+                    [
+                        a
+                        for e in entities.values()
+                        for a in [e.canonical_name] + e.aliases
+                    ]
+                )
+                == len(
+                    {
+                        a.lower()
+                        for e in entities.values()
+                        for a in [e.canonical_name] + e.aliases
+                    }
+                )
             )
         )
         .map(lambda entities: Registry(entities=entities))

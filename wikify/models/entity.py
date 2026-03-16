@@ -9,7 +9,7 @@ class Entity(BaseModel):
     """An entity in the registry."""
 
     canonical_name: str
-    aliases: list[str] = []
+    aliases: list[str]
     type: str  # person, location, object, organization, phenomenon
     first_appearance: int  # Session number
 
