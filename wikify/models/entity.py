@@ -1,5 +1,7 @@
 """Entity and EntityData models."""
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 from .fact import ConfidenceLevel
@@ -12,6 +14,7 @@ class Entity(BaseModel):
     aliases: list[str]
     type: str  # person, location, object, organization, phenomenon
     first_appearance: int  # Session number
+    description: Optional[str]
 
     def merge(self, other: Entity) -> Entity:
         """Creates a new entity that is the result of merging other on top of self.
@@ -24,6 +27,7 @@ class Entity(BaseModel):
         - aliases: union of existing + other, excluding new canonical_name
         - type: uses other (more recent) value
         - first_appearance: minimum of existing and other
+        - description: string concatenation, existing first
 
         Postcondition: Does not alter self.
 
@@ -40,7 +44,14 @@ class Entity(BaseModel):
             aliases=sorted(all_aliases),
             type=other.type,
             first_appearance=min(self.first_appearance, other.first_appearance),
+            description=self.concat_opt([self.description, other.description]),
         )
+
+    def concat_opt(self, opts: list[Optional[str]]) -> Optional[str]:
+        if all(a is None for a in opts):
+            return None
+        else:
+            return "".join([a or "" for a in opts])
 
 
 class AggregatedFact(BaseModel):

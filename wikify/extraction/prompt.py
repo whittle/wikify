@@ -102,8 +102,11 @@ def _stringify_known_entity(entity_id: str, entity: Entity) -> str:
     aliases_str = ""
     if entity.aliases:
         aliases_str = f" (aliases: {', '.join(entity.aliases)})"
+    description_str = ""
+    if entity.description:
+        description_str = f" {entity.description}"
 
-    return f"- `{entity_id}`: **{entity.canonical_name}**{aliases_str} [{entity.type}]"
+    return f"- `{entity_id}`: [{entity.type}] **{entity.canonical_name}**{description_str}{aliases_str}"
 
 
 def _build_known_entities_section(registry: Registry) -> str:

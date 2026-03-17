@@ -40,12 +40,14 @@ class TestBuildExtractionPrompt:
                     aliases=["the Baron", "Lord Aldric"],
                     type="person",
                     first_appearance=1,
+                    description=None,
                 ),
                 "thornwood-keep": Entity(
                     canonical_name="Thornwood Keep",
                     aliases=["the Keep"],
                     type="location",
                     first_appearance=1,
+                    description="castle in the forest",
                 ),
             }
         )
@@ -65,6 +67,7 @@ class TestBuildExtractionPrompt:
                     aliases=["the Baron", "Lord Aldric"],
                     type="person",
                     first_appearance=1,
+                    description=None,
                 ),
             }
         )

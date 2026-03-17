@@ -123,6 +123,7 @@ def register_action(target: list[Any], source: list[Any], env: Any) -> int:
                 aliases=extracted.aliases,
                 type=extracted.type,
                 first_appearance=extracted.first_appearance,
+                description=None,
             )
             registry.merge_entity(extracted.entity_id, entity)
 

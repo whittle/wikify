@@ -125,3 +125,33 @@ class TestMergeEntity:
         result = old_entity.merge(new_entity)
 
         assert result.first_appearance == new_entity.first_appearance
+
+    @given(st.data())
+    def test_merge_uses_existing_description_if_none_added(self, data):
+        """Merging uses the existing description if other has no description."""
+        old_entity = data.draw(st.builds(Entity, description=st.text()))
+        new_entity = data.draw(st.builds(Entity, description=st.none()))
+
+        result = old_entity.merge(new_entity)
+
+        assert result.description == old_entity.description
+
+    @given(st.data())
+    def test_merge_uses_new_description_if_none_existing(self, data):
+        """Merging uses the new description if self has no description."""
+        old_entity = data.draw(st.builds(Entity, description=st.none()))
+        new_entity = data.draw(st.builds(Entity, description=st.text()))
+
+        result = old_entity.merge(new_entity)
+
+        assert result.description == new_entity.description
+
+    @given(st.data())
+    def test_merge_concats_descriptions_if_both_present(self, data):
+        """Merging concats the descriptions together, existing first, if neither is None."""
+        old_entity = data.draw(st.builds(Entity, description=st.text()))
+        new_entity = data.draw(st.builds(Entity, description=st.text()))
+
+        result = old_entity.merge(new_entity)
+
+        assert result.description == old_entity.description + new_entity.description
