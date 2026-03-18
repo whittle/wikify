@@ -129,8 +129,6 @@ Models are defined in `wikify/models/`. Key types:
 
 ### Registry (`wikify/models/registry.py`)
 - `entities`: dict mapping entity_id → Entity
-- `alias_index`: Computed field mapping lowercase names → entity_id
-- `resolve(name)`: Look up entity_id by name/alias
 - `get_entity(entity_id)`: Retrieve an Entity
 - `merge_entity(entity_id, entity)`: Add or merge an entity (union aliases, min first_appearance)
 
@@ -194,7 +192,7 @@ A test is valuable if it can fail when the code is wrong. Do not write tests tha
 
 A test is valuable when it verifies:
 
-- **Computed behavior**: The `alias_index` is derived from entities—test that the derivation is correct.
+- **Computed behavior**: Derived values like merged aliases—test that the derivation is correct.
 - **Invariants across inputs**: Use property tests to verify that behavior holds for arbitrary valid inputs, not just one example.
 - **Edge cases in logic**: Empty inputs, boundary conditions, error handling.
 - **Integration contracts**: Parsing external formats, API responses, file formats with real-world quirks.
