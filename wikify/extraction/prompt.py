@@ -35,9 +35,9 @@ Return a JSON object with these fields:
   ],
   "entities": [
     {{
-      "entity_id": "sera-ranger",
-      "canonical_name": "Sera",
-      "aliases": ["the ranger"],
+      "entity_id": "serafina-diallo",
+      "canonical_name": "Serafina Diallo",
+      "aliases": ["Sera", "Sera the ranger"],
       "type": "person"
     }}
   ],
@@ -58,8 +58,9 @@ Return a JSON object with these fields:
 **context_resolutions**: Document how contextual references (like "the mountain" or \
 "the old man") are resolved to entity_ids for this session.
 
-**entities**: Only include NEW entities discovered in this session that are not in \
-the known entities list above. Each entity needs:
+**entities**: Only include new entities discovered in this session that are not \
+in the known entities list above, or existing entities that need their \
+canonical_name, aliases, or type updated. Each entity needs:
 - `entity_id`: lowercase-hyphenated unique identifier
 - `canonical_name`: the primary name for this entity
 - `aliases`: other names/titles used for this entity
