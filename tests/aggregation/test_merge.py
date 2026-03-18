@@ -114,6 +114,28 @@ class TestMergeEntityData:
         assert result.canonical_name not in result.aliases
 
     @given(st.data())
+    def test_added_aliases(self, data):
+        """Any canonical names that are replaced by later canonical names become aliases."""
+        entity_id = data.draw(st.text())
+        entity_type = data.draw(st.text())
+        canonical_names = data.draw(st.lists(st.text(), min_size=2, unique=True))
+        entity_data = [
+            data.draw(
+                st.builds(
+                    EntityData,
+                    entity_id=st.just(entity_id),
+                    type=st.just(entity_type),
+                    canonical_name=st.just(s),
+                )
+            )
+            for s in canonical_names
+        ]
+
+        result: EntityData = merge_entity_data(entity_data)
+
+        assert set(result.aliases) >= set(canonical_names[:-1])
+
+    @given(st.data())
     def test_sum_aliases(self, data):
         """The aliases of the result should include all aliases of inputs, except an alias matching the canonical name of the result."""
         entity_id = data.draw(st.text())
@@ -124,7 +146,6 @@ class TestMergeEntityData:
                     EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
                 ),
                 min_size=2,
-                unique_by=lambda a: "|".join(a.aliases),
             )
         )
 
@@ -133,7 +154,7 @@ class TestMergeEntityData:
         expected_aliases = {
             alias for entity in entity_data for alias in entity.aliases
         } - {result.canonical_name}
-        assert set(result.aliases) == expected_aliases
+        assert set(result.aliases) >= set(expected_aliases)
 
     @given(st.data())
     def test_unified_type(self, data):

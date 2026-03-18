@@ -19,7 +19,10 @@ def merge_entity_data(data: list[EntityData]) -> EntityData:
     canonical_name = data[-1].canonical_name
     aliases = sorted(
         list(
-            {alias for entity in data for alias in entity.aliases}
+            (
+                {alias for entity in data for alias in entity.aliases}
+                | {entity.canonical_name for entity in data}
+            )
             - {data[-1].canonical_name}
         )
     )
