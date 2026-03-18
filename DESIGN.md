@@ -17,12 +17,13 @@ Manually maintaining a wiki is tedious and falls out of sync. This system uses L
 
 ### Separation of Concerns
 
-The pipeline has four distinct phases with clear boundaries:
+The pipeline has five distinct phases with clear boundaries:
 
 1. **Extraction (LLM)**: Session notes → structured facts
 2. **Split (mechanical)**: Extraction → per-entity-per-session data files
-3. **Merge (mechanical)**: Entity-session files → per-entity data files
-4. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
+3. **Register (mechanical)**: Extraction → updated entity registry
+4. **Merge (mechanical)**: Entity-session files → per-entity data files
+5. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
 
 This separation means:
 - Session extractions are immutable snapshots with full provenance
@@ -217,18 +218,9 @@ These categories were chosen because they:
       "type": "location",
       "first_appearance": 1
     }
-  },
-  "alias_index": {
-    "aldric": "baron-aldric",
-    "baron aldric": "baron-aldric",
-    "baron aldric von stein": "baron-aldric",
-    "thornwood": "thornwood",
-    "thornwood village": "thornwood"
   }
 }
 ```
-
-The `alias_index` is denormalized for fast lookups during aggregation.
 
 ### Aggregated Entity Format
 
@@ -364,6 +356,7 @@ This means:
 |---------|-------|--------|-------|
 | `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` | LLM call, sequential |
 | `SplitSession` | `session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, one per extraction |
+| `RegisterEntities` | `session-NNN.json` | `entity-registry.json` | Mechanical, updates registry |
 | `MergeEntity` | `entities/sessions/*/entity-id.json` | `entities/data/entity-id.json` | Mechanical, parallel |
 | `RenderArticle` | `entity-name.json` | `entity-name.md` | LLM call, parallel |
 
@@ -475,13 +468,13 @@ The categories are essentially a text classification task, which LLMs do reliabl
 
 ### Handling New Entities
 
-When extraction identifies an entity not in the registry (`is_new: true`), two approaches were considered:
+When extraction identifies a new entity, two approaches were considered:
 
 **Auto-add**: Automatically add to registry. Faster, but risks creating duplicate entities for the same thing ("the Old Library" in session 8 might be the same as "the library" in session 12).
 
 **Queue for review**: Add to a pending list for human review. Safer for entity resolution.
 
-The recommended approach is to auto-add entities but periodically review the registry for duplicates that should be merged. Entity merging is straightforward: update the registry, re-run aggregation, and the facts automatically consolidate.
+The implemented approach is auto-add via the Register phase: new entities are automatically merged into the registry during aggregation. This enables sequential extraction to benefit from previously discovered entities. Periodically review the registry for duplicates that should be merged. Entity merging is straightforward: update the registry, re-run aggregation, and the facts automatically consolidate.
 
 ### Handling Contradictions
 
@@ -525,7 +518,21 @@ For each entity in the extraction:
 
 Each entity-session file contains an `EntityData` object representing what is known about that entity from that single session.
 
-### Phase 2b: Merge
+### Phase 2b: Register
+
+**Input**: Session extraction file
+
+**Process**: Mechanical registry update (no LLM)
+
+**Output**: Updated `entity-registry.json`
+
+For each entity discovered in the extraction:
+1. If the entity_id is new, add it to the registry
+2. If the entity_id exists, merge the new data (union aliases, use minimum first_appearance)
+
+This enables "Session N benefits from entities discovered in sessions 1 through N-1" by automatically propagating discovered entities to the registry.
+
+### Phase 2c: Merge
 
 **Input**: All entity-session files for a given entity
 
