@@ -111,7 +111,7 @@ No need to reprocess the entire corpus for routine updates.
 
 ### Session Extraction Format
 
-Each `/sessions/extracted/session-NNN.json`:
+Each `/sessions/extracted/session-{NNN}.json`:
 
 ```json
 {
@@ -222,9 +222,37 @@ These categories were chosen because they:
 }
 ```
 
+### Session Entity Facts Format (Intermediate)
+
+Each `/entities/sessions/session-{NNN}/{entity-id}.json`:
+
+```json
+{
+  "entity_id": "baron-aldric",
+  "facts": [
+    {
+      "text": "Served as court wizard to King Aldren before his exile",
+      "category": "history",
+      "confidence": "stated",
+      "source_session": 12,
+      "object_entities": ["king-aldren"]
+    }
+  ],
+  "referenced_by": [
+    {
+      "source_entity": "the-sunken-library",
+      "fact_text": "Baron Aldric is searching for a tome hidden in the library",
+      "source_session": 12
+    }
+  ]
+}
+```
+
+These files contain only facts and references — no entity metadata. Entity metadata (`canonical_name`, `aliases`, `type`, `first_appearance`) is retrieved from the registry during merge.
+
 ### Aggregated Entity Format
 
-Each `/entities/data/baron-aldric.json`:
+Each `/entities/data/{entity-id}.json`:
 
 ```json
 {
@@ -355,9 +383,9 @@ This means:
 | Builder | Input | Output | Notes |
 |---------|-------|--------|-------|
 | `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` | LLM call, sequential |
-| `SplitSession` | `session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, one per extraction |
+| `SplitSession` | `session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, outputs SessionEntityFacts |
 | `RegisterEntities` | `session-NNN.json` | `entity-registry.json` | Mechanical, updates registry |
-| `MergeEntity` | `entities/sessions/*/entity-id.json` | `entities/data/entity-id.json` | Mechanical, parallel |
+| `MergeEntity` | `entities/sessions/*/entity-id.json` + registry | `entities/data/entity-id.json` | Mechanical, outputs EntityData |
 | `RenderArticle` | `entity-name.json` | `entity-name.md` | LLM call, parallel |
 
 ### Build Commands
@@ -481,7 +509,7 @@ The implemented approach is auto-add via the Register phase: new entities are au
 Information in RPGs gets retconned, misremembered, or deliberately falsified by NPCs. Rather than silently overwriting facts, the system preserves history:
 
 - Both facts are kept in the entity file
-- The older fact can be marked with `"superseded_by": <session_number>` during a manual review pass
+- The older fact can be marked with `"superseded_by": {session_number}` during a manual review pass
 - The article generator can phrase contradictions narratively: "Originally believed to be from the Northern Kingdoms [S5], though later revealed to be Eldarian [S23]"
 
 ---
@@ -511,12 +539,12 @@ The extraction must run against a clean, committed registry. The output records:
 
 **Output**: Per-entity-per-session data files in `entities/sessions/session-NNN/`
 
-For each entity in the extraction:
+For each entity referenced in the extraction's facts (as subject or object):
 1. Collect facts where `subject_entity` matches the entity
 2. Collect `referenced_by` entries from facts where this entity appears in `object_entities`
 3. Write entity-session file as `entities/sessions/session-NNN/{entity-id}.json`
 
-Each entity-session file contains an `EntityData` object representing what is known about that entity from that single session.
+Each entity-session file contains a `SessionEntityFacts` object — just facts and references, no entity metadata. This means split doesn't need access to the registry and naturally handles facts about entities that already exist.
 
 ### Phase 2b: Register
 
@@ -534,16 +562,23 @@ This enables "Session N benefits from entities discovered in sessions 1 through 
 
 ### Phase 2c: Merge
 
-**Input**: All entity-session files for a given entity
+**Input**: All entity-session files for a given entity + entity registry
 
 **Process**: Mechanical merge (no LLM)
 
 **Output**: Per-entity data file in `entities/data/`
 
 For each entity in the registry:
-1. Collect all `entities/sessions/*/entity-id.json` files
-2. Merge facts, references, and session lists
-3. Write merged entity data file
+1. Load entity metadata from the registry (`canonical_name`, `aliases`, `type`, `first_appearance`)
+2. Collect all `entities/sessions/*/entity-id.json` files (`SessionEntityFacts`)
+3. Validate all session files are for the expected entity
+4. Combine facts and references from all session files
+5. Derive `sessions_appeared` from facts' `source_session` values
+6. Write merged `EntityData` file
+
+**Errors**:
+- `EntityNotFoundError`: Raised if the entity_id is not in the registry
+- `EntityMismatchError`: Raised if a session file contains data for a different entity
 
 Both phases are fully deterministic and can be re-run any time. They're also fast — no LLM calls, just JSON parsing and restructuring.
 
@@ -551,6 +586,7 @@ The split/merge separation provides:
 - **Granular intermediate artifacts**: Each entity-session file is inspectable
 - **Explicit dependencies**: The build system tracks which sessions contribute to each entity
 - **Easier debugging**: Trace any fact back to its specific session file
+- **Single source of truth**: Entity metadata lives only in the registry, not duplicated in split files
 
 ### Phase 3: Rendering
 

@@ -1,11 +1,21 @@
 """Error types for aggregation."""
 
-from wikify.models.entity import EntityData
+
+class EntityNotFoundError(Exception):
+    """Raised when an entity_id is not found in the registry."""
+
+    def __init__(self, entity_id: str, message: str = ""):
+        self.entity_id = entity_id
+        super().__init__(message or f"Entity '{entity_id}' not found in registry.")
 
 
-class EntityDataMergeIncompatibility(Exception):
-    """Exception indicating that the attempted merge was on individually valid EntityData objects that are not jointly mergeable."""
+class EntityMismatchError(Exception):
+    """Raised when a SessionEntityFacts has a different entity_id than expected."""
 
-    def __init__(self, entity_data=list[EntityData], message: str = ""):
-        self.entity_data = entity_data
-        super().__init__(message or "Could not merge entity data.")
+    def __init__(self, expected: str, actual: str, message: str = ""):
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            message
+            or f"Expected entity_id '{expected}', but found '{actual}' in session facts."
+        )

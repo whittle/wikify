@@ -28,6 +28,10 @@ git clone --recursive git@github.com:whittle/wikify.git
 git submodule update --init
 ```
 
+### Design Doc
+
+For a more in-depth look at the design of this knowledge pipeline, read `DESIGN.md`.
+
 ### Commit workflow
 
 Data changes are committed in the submodule:
@@ -54,7 +58,7 @@ wikify/
   wikify/
     models/           # Pydantic data models
       fact.py         # Fact, ConfidenceLevel
-      entity.py       # Entity, EntityData
+      entity.py       # Entity, SessionEntityFacts, EntityData
       extraction.py   # ExtractionResult, ContextResolution
       registry.py     # Registry, AliasIndex
 
@@ -63,9 +67,10 @@ wikify/
       parser.py       # parse_extraction_response(raw) -> ExtractionResult
       extract.py      # extract_session(session, registry, client) -> ExtractionResult
 
-    aggregation/      # Extractions → per-entity data (two-step process)
-      split.py        # split_session(extraction) -> writes entity-session files
-      merge.py        # merge_entity(entity_id, session_dir) -> EntityData
+    aggregation/      # Extractions → per-entity data
+      split.py        # all_session_facts(extraction) -> list[SessionEntityFacts]
+      merge.py        # merge_session_facts(entity_id, entity, session_facts) -> EntityData
+      errors.py       # EntityNotFoundError, EntityMismatchError
 
     rendering/        # Entity data → markdown articles
       prompt.py       # build_render_prompt(entity_data) -> str
@@ -100,7 +105,7 @@ wikify/
       prompts/        # Output: session-001.txt (full interpolated prompt)
       extracted/      # Output: session-001.json, session-002.json, ...
     entities/
-      sessions/       # Intermediate: per-entity-per-session data
+      sessions/       # Intermediate: SessionEntityFacts (facts only, no metadata)
         session-001/  #   baron-aldric.json, thornwood.json, ...
         session-002/  #   ...
       data/           # Output: baron-aldric.json, ...
@@ -133,9 +138,16 @@ Models are defined in `wikify/models/`. Key types:
 - `get_entity(entity_id)`: Retrieve an Entity
 - `merge_entity(entity_id, entity)`: Add or merge an entity (union aliases, min first_appearance)
 
+### SessionEntityFacts (`wikify/models/entity.py`)
+- Intermediate format: facts about an entity from a single session
+- Contains only `entity_id`, `facts`, `referenced_by` (no entity metadata)
+- Produced by split, consumed by merge
+
 ### EntityData (`wikify/models/entity.py`)
 - Aggregated view of an entity for article rendering
-- Contains `facts`, `referenced_by`, `sessions_appeared`, `last_updated`
+- Entity metadata (`canonical_name`, `aliases`, `type`, `first_appearance`) from registry
+- Facts and references from merged SessionEntityFacts files
+- `sessions_appeared` derived from facts' `source_session`
 
 ## Build System
 
@@ -161,9 +173,9 @@ Sessions must be extracted in order. Session N benefits from entities discovered
 ```
 session-NNN.txt + registry → session-NNN.json (LLM extraction)
                            → sessions/prompts/session-NNN.txt (side effect: persisted prompt)
-session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split)
+session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split → SessionEntityFacts)
 session-NNN.json → entity-registry.json (mechanical register, updates with discovered entities)
-entities/sessions/*/entity-id.json → entities/data/entity-id.json (mechanical merge)
+entities/sessions/*/entity-id.json + registry → entities/data/entity-id.json (mechanical merge → EntityData)
 entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ```
 
@@ -173,6 +185,10 @@ The register step merges newly discovered and changed entities from extractions
 into the registry. This enables "Session N benefits from entities discovered in
 sessions 1 through N-1" by automatically updating the registry with each
 extraction's discoveries.
+
+Split files contain only facts and references (SessionEntityFacts), not entity metadata.
+The merge step combines facts from all sessions with entity metadata from the registry
+to produce the final EntityData.
 
 ### Build commands
 
@@ -234,12 +250,19 @@ class MockLLMClient:
 ### Property tests for aggregation
 
 ```python
-@given(st.lists(valid_extraction_strategy()))
-def test_aggregation_order_independent(extractions):
-    shuffled = random.sample(extractions, len(extractions))
-    result1 = aggregate_entity("x", extractions, registry)
-    result2 = aggregate_entity("x", shuffled, registry)
-    assert result1 == result2
+@given(st.data())
+def test_includes_all_subject_entities(data):
+    """All subject entities from facts should get a SessionEntityFacts."""
+    facts = data.draw(st.lists(st.builds(Fact), min_size=1))
+    extraction = data.draw(
+        st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+    )
+
+    result = all_session_facts(extraction)
+
+    subject_ids = {f.subject_entity for f in facts}
+    result_ids = {sf.entity_id for sf in result}
+    assert subject_ids <= result_ids
 ```
 
 ## Session Context Hints

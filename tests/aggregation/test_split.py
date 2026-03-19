@@ -1,15 +1,17 @@
+from datetime import datetime
+
 from hypothesis import given
 from hypothesis import strategies as st
 
 from wikify.aggregation.split import (
     aggregate_fact,
-    all_entity_data_for_session,
+    all_session_facts,
     extract_facts_about_entity,
     extract_references_to_entity,
     reference_fact,
-    session_entity_data,
+    session_facts_for_entity,
 )
-from wikify.models.entity import AggregatedFact, EntityData, Reference
+from wikify.models.entity import AggregatedFact, Reference, SessionEntityFacts
 from wikify.models.extraction import ExtractedEntity, ExtractionResult
 from wikify.models.fact import Fact
 
@@ -226,81 +228,128 @@ class TestExtractReferencesToEntity:
             assert ref.source_session == extraction.session_number
 
 
-class TestSessionEntityData:
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_entity_id_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
+class TestSessionFactsForEntity:
+    @given(st.builds(ExtractionResult), st.text())
+    def test_entity_id_identity(self, extraction_result, entity_id):
+        result: SessionEntityFacts = session_facts_for_entity(
+            extraction_result, entity_id
+        )
 
-        assert result.entity_id == entity.entity_id
-
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_canonical_name_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
-
-        assert result.canonical_name == entity.canonical_name
-
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_aliases_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
-
-        assert result.aliases == entity.aliases
-
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_type_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
-
-        assert result.type == entity.type
-
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_first_appearance_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
-
-        assert result.first_appearance == entity.first_appearance
-
-    @given(st.builds(ExtractionResult), st.builds(ExtractedEntity))
-    def test_sessions_appeared_identity(self, extraction_result, entity):
-        result: EntityData = session_entity_data(extraction_result, entity)
-
-        assert result.sessions_appeared == [extraction_result.session_number]
-
-
-class TestAllEntityDataForSession:
-    @given(st.builds(ExtractionResult))
-    def test_length(self, extraction_result):
-        result: list[EntityData] = all_entity_data_for_session(extraction_result)
-
-        assert len(result) == len(extraction_result.entities)
-
-    @given(st.builds(ExtractionResult))
-    def test_entity_ids(self, extraction_result):
-        result: list[EntityData] = all_entity_data_for_session(extraction_result)
-
-        assert {a.entity_id for a in result} == {
-            a.entity_id for a in extraction_result.entities
-        }
+        assert result.entity_id == entity_id
 
     @given(st.data())
-    def test_facts_cardinality(self, data):
-        """The concatenation of all facts from entities should have the same length as the input facts."""
-        entities = data.draw(
-            st.lists(
-                st.builds(ExtractedEntity), min_size=1, unique_by=lambda a: a.entity_id
+    def test_facts_extracted(self, data):
+        entity_id = data.draw(st.text())
+        relevant_facts = data.draw(
+            st.lists(st.builds(Fact, subject_entity=st.just(entity_id)))
+        )
+        irrelevant_facts = data.draw(
+            st.lists(st.builds(Fact).filter(lambda a: a.subject_entity != entity_id))
+        )
+        extraction = data.draw(
+            st.builds(
+                ExtractionResult,
+                facts=st.permutations(relevant_facts + irrelevant_facts),
             )
         )
-        facts = data.draw(
+
+        result: SessionEntityFacts = session_facts_for_entity(extraction, entity_id)
+
+        assert len(result.facts) == len(relevant_facts)
+
+    @given(st.data())
+    def test_references_extracted(self, data):
+        entity_id = data.draw(st.text())
+        relevant_facts = data.draw(
             st.lists(
                 st.builds(
                     Fact,
-                    subject_entity=st.sampled_from([a.entity_id for a in entities]),
+                    object_entities=st.permutations(
+                        [entity_id] + data.draw(st.lists(st.text()))
+                    ),
                 )
+            )
+        )
+        irrelevant_facts = data.draw(
+            st.lists(
+                st.builds(Fact).filter(lambda a: entity_id not in a.object_entities)
             )
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult, entities=st.just(entities), facts=st.just(facts)
+                ExtractionResult,
+                facts=st.permutations(relevant_facts + irrelevant_facts),
             )
         )
 
-        result: list[EntityData] = all_entity_data_for_session(extraction)
+        result: SessionEntityFacts = session_facts_for_entity(extraction, entity_id)
 
-        assert len(sum([a.facts for a in result], [])) == len(facts)
+        assert len(result.referenced_by) == len(relevant_facts)
+
+
+class TestAllSessionFacts:
+    @given(st.data())
+    def test_includes_all_subject_entities(self, data):
+        """All subject entities from facts should get a SessionEntityFacts."""
+        facts = data.draw(st.lists(st.builds(Fact), min_size=1))
+        extraction = data.draw(
+            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+        )
+
+        result: list[SessionEntityFacts] = all_session_facts(extraction)
+
+        subject_ids = {f.subject_entity for f in facts}
+        result_ids = {sf.entity_id for sf in result}
+        assert subject_ids <= result_ids
+
+    @given(st.data())
+    def test_includes_all_object_entities(self, data):
+        """All object entities from facts should get a SessionEntityFacts."""
+        facts = data.draw(st.lists(st.builds(Fact), min_size=1))
+        extraction = data.draw(
+            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+        )
+
+        result: list[SessionEntityFacts] = all_session_facts(extraction)
+
+        object_ids = {eid for f in facts for eid in f.object_entities}
+        result_ids = {sf.entity_id for sf in result}
+        assert object_ids <= result_ids
+
+    @given(st.data())
+    def test_facts_cardinality(self, data):
+        """The total facts across all SessionEntityFacts equals input facts count."""
+        entity_ids = data.draw(st.lists(st.text(), min_size=1, unique=True))
+        facts = data.draw(
+            st.lists(
+                st.builds(
+                    Fact,
+                    subject_entity=st.sampled_from(entity_ids),
+                    object_entities=st.just([]),  # No object entities for simpler count
+                )
+            )
+        )
+        extraction = data.draw(
+            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+        )
+
+        result: list[SessionEntityFacts] = all_session_facts(extraction)
+
+        total_facts = sum(len(sf.facts) for sf in result)
+        assert total_facts == len(facts)
+
+    def test_empty_extraction(self):
+        """An extraction with no facts should produce no SessionEntityFacts."""
+        extraction = ExtractionResult(
+            session_number=1,
+            extracted_at=datetime.fromisoformat("2024-01-01T00:00:00"),
+            registry_commit="abc123",
+            extractor_version="1.0",
+            context_resolutions=[],
+            entities=[],
+            facts=[],
+        )
+
+        result = all_session_facts(extraction)
+
+        assert result == []

@@ -72,6 +72,18 @@ class Reference(BaseModel):
     source_session: int
 
 
+class SessionEntityFacts(BaseModel):
+    """Facts about an entity from a single session.
+
+    Used as intermediate split output before merge combines them with
+    registry metadata into full EntityData.
+    """
+
+    entity_id: str
+    facts: list[AggregatedFact]
+    referenced_by: list[Reference]
+
+
 class EntityData(BaseModel):
     """Aggregated data for an entity, used to render wiki articles."""
 

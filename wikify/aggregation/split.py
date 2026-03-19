@@ -1,7 +1,7 @@
 """Procedures for splitting an extraction into per-entity-per-session data."""
 
-from wikify.models.entity import AggregatedFact, EntityData, Reference
-from wikify.models.extraction import ExtractedEntity, ExtractionResult
+from wikify.models.entity import AggregatedFact, Reference, SessionEntityFacts
+from wikify.models.extraction import ExtractionResult
 from wikify.models.fact import Fact
 
 
@@ -43,24 +43,22 @@ def extract_references_to_entity(
     ]
 
 
-def session_entity_data(
-    extraction: ExtractionResult, entity: ExtractedEntity
-) -> EntityData:
-    return EntityData(
-        entity_id=entity.entity_id,
-        canonical_name=entity.canonical_name,
-        aliases=entity.aliases,
-        type=entity.type,
-        first_appearance=entity.first_appearance,
-        facts=extract_facts_about_entity(extraction, entity.entity_id),
-        referenced_by=extract_references_to_entity(extraction, entity.entity_id),
-        sessions_appeared=[extraction.session_number],
+def session_facts_for_entity(
+    extraction: ExtractionResult, entity_id: str
+) -> SessionEntityFacts:
+    """Create SessionEntityFacts for an entity from this session."""
+    return SessionEntityFacts(
+        entity_id=entity_id,
+        facts=extract_facts_about_entity(extraction, entity_id),
+        referenced_by=extract_references_to_entity(extraction, entity_id),
     )
 
 
-def all_entity_data_for_session(
-    extraction_result: ExtractionResult,
-) -> list[EntityData]:
-    return [
-        session_entity_data(extraction_result, a) for a in extraction_result.entities
-    ]
+def all_session_facts(extraction: ExtractionResult) -> list[SessionEntityFacts]:
+    """Get SessionEntityFacts for all entities referenced in this session's facts."""
+    entity_ids: set[str] = set()
+    for fact in extraction.facts:
+        entity_ids.add(fact.subject_entity)
+        entity_ids.update(fact.object_entities)
+
+    return [session_facts_for_entity(extraction, eid) for eid in entity_ids]

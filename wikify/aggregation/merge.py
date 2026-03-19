@@ -1,41 +1,34 @@
-"""Procedures for merging entity-session data into per-entity data."""
+"""Procedures for merging entity session data."""
 
-from wikify.models.entity import EntityData
-
-from .errors import EntityDataMergeIncompatibility
+from wikify.models.entity import Entity, EntityData, SessionEntityFacts
 
 
-def merge_entity_data(data: list[EntityData]) -> EntityData:
-    """Merge EntityData records into a single EntityData representing everything
-    known about the entity from the available data.
+def merge_session_facts(
+    entity_id: str, entity: Entity, session_facts: list[SessionEntityFacts]
+) -> EntityData:
+    """Merge SessionEntityFacts with entity metadata into EntityData.
 
-    Input list is order-sensitive: records are assumed to be in recency order
-    with the most recent at the end of the list.
+    Args:
+        entity_id: The entity identifier
+        entity: Entity metadata from the registry
+        session_facts: List of SessionEntityFacts from multiple sessions
 
+    Returns:
+        Merged EntityData ready for rendering
     """
-    if len({(a.entity_id, a.type) for a in data}) > 1:
-        raise EntityDataMergeIncompatibility(data)
-
-    canonical_name = data[-1].canonical_name
-    aliases = sorted(
-        list(
-            (
-                {alias for entity in data for alias in entity.aliases}
-                | {entity.canonical_name for entity in data}
-            )
-            - {data[-1].canonical_name}
-        )
+    all_facts = [f for sf in session_facts for f in sf.facts]
+    all_refs = [r for sf in session_facts for r in sf.referenced_by]
+    sessions = sorted(
+        {f.source_session for f in all_facts} | {r.source_session for r in all_refs}
     )
 
     return EntityData(
-        entity_id=data[0].entity_id,
-        canonical_name=canonical_name,
-        aliases=aliases,
-        type=data[0].type,
-        first_appearance=min([a.first_appearance for a in data]),
-        facts=[fact for entity in data for fact in entity.facts],
-        referenced_by=[ref for entity in data for ref in entity.referenced_by],
-        sessions_appeared=sorted(
-            [session for entity in data for session in entity.sessions_appeared]
-        ),
+        entity_id=entity_id,
+        canonical_name=entity.canonical_name,
+        aliases=entity.aliases,
+        type=entity.type,
+        first_appearance=entity.first_appearance,
+        facts=all_facts,
+        referenced_by=all_refs,
+        sessions_appeared=sessions,
     )

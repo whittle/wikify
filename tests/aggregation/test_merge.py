@@ -1,282 +1,123 @@
-from hypothesis import assume, given
+from hypothesis import given
 from hypothesis import strategies as st
 
-from wikify.aggregation.errors import EntityDataMergeIncompatibility
-from wikify.aggregation.merge import merge_entity_data
-from wikify.models.entity import AggregatedFact, EntityData, Reference
-from wikify.models.fact import ConfidenceLevel
+from wikify.aggregation.merge import merge_session_facts
+from wikify.models.entity import (
+    AggregatedFact,
+    Entity,
+    EntityData,
+    Reference,
+    SessionEntityFacts,
+)
 
 
-class TestMergeEntityData:
-    def normalize_entity_data(self, data: EntityData) -> EntityData:
-        return EntityData(
-            entity_id=data.entity_id,
-            canonical_name=data.canonical_name,
-            aliases=sorted(
-                list({alias for alias in data.aliases} - {data.canonical_name})
-            ),
-            type=data.type,
-            first_appearance=data.first_appearance,
-            facts=data.facts,
-            referenced_by=data.referenced_by,
-            sessions_appeared=sorted(data.sessions_appeared),
-        )
-
-    def test_empty_exception(self):
-        """If the input list is empty, throw an exception."""
-        try:
-            _result: EntityData = merge_entity_data([])
-        except IndexError:
-            pass
-        else:
-            assert False
-
-    @given(st.data())
-    def test_single_identity(self, data):
-        """If there's only one element to merge, return it unchanged."""
-        entity_data = self.normalize_entity_data(data.draw(st.builds(EntityData)))
-
-        result: EntityData = merge_entity_data([entity_data])
-
-        assert result == entity_data
-
-    @given(st.data())
-    def test_unified_entity_ids(self, data):
-        """If the entities to be merged have different ids, an exception is thrown."""
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(EntityData, type=st.just(entity_type)),
-                min_size=2,
-                unique_by=lambda a: a.entity_id,
-            )
-        )
-
-        try:
-            _result: EntityData = merge_entity_data(entity_data)
-        except EntityDataMergeIncompatibility:
-            pass
-        else:
-            assume(False)
-
-    @given(st.data())
-    def test_entity_id_identity(self, data):
-        """If all the input entity_ids are the same, the output entity_id also matches."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
-
-        result: EntityData = merge_entity_data(entity_data)
+class TestMergeSessionFacts:
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_entity_id_identity(self, entity_id, entity, session_facts):
+        """The output entity_id matches the input entity_id."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
         assert result.entity_id == entity_id
 
-    @given(st.data())
-    def test_canonical_name_selection(self, data):
-        """The canonical name of the result should be the canonical name of the final (most recent) input."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_canonical_name_from_entity(self, entity_id, entity, session_facts):
+        """canonical_name comes from the Entity parameter."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-        result: EntityData = merge_entity_data(entity_data)
+        assert result.canonical_name == entity.canonical_name
 
-        assert result.canonical_name == entity_data[-1].canonical_name
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_aliases_from_entity(self, entity_id, entity, session_facts):
+        """aliases come from the Entity parameter."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-    @given(st.data())
-    def test_excluded_alias(self, data):
-        """The canonical name of the resulting entity is excluded from its list of aliases."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
+        assert result.aliases == entity.aliases
 
-        result: EntityData = merge_entity_data(entity_data)
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_type_from_entity(self, entity_id, entity, session_facts):
+        """type comes from the Entity parameter."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-        assert result.canonical_name not in result.aliases
+        assert result.type == entity.type
 
-    @given(st.data())
-    def test_added_aliases(self, data):
-        """Any canonical names that are replaced by later canonical names become aliases."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        canonical_names = data.draw(st.lists(st.text(), min_size=2, unique=True))
-        entity_data = [
-            data.draw(
-                st.builds(
-                    EntityData,
-                    entity_id=st.just(entity_id),
-                    type=st.just(entity_type),
-                    canonical_name=st.just(s),
-                )
-            )
-            for s in canonical_names
-        ]
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_first_appearance_from_entity(self, entity_id, entity, session_facts):
+        """first_appearance comes from the Entity parameter."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-        result: EntityData = merge_entity_data(entity_data)
+        assert result.first_appearance == entity.first_appearance
 
-        assert set(result.aliases) >= set(canonical_names[:-1])
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_all_facts_collected(self, entity_id, entity, session_facts):
+        """All facts from all SessionEntityFacts appear in output."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-    @given(st.data())
-    def test_sum_aliases(self, data):
-        """The aliases of the result should include all aliases of inputs, except an alias matching the canonical name of the result."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
+        expected_facts = [f for sf in session_facts for f in sf.facts]
+        assert result.facts == expected_facts
 
-        result: EntityData = merge_entity_data(entity_data)
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_all_references_collected(self, entity_id, entity, session_facts):
+        """All references from all SessionEntityFacts appear in output."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-        expected_aliases = {
-            alias for entity in entity_data for alias in entity.aliases
-        } - {result.canonical_name}
-        assert set(result.aliases) >= set(expected_aliases)
+        expected_refs = [r for sf in session_facts for r in sf.referenced_by]
+        assert result.referenced_by == expected_refs
 
-    @given(st.data())
-    def test_unified_type(self, data):
-        """If the entities to be merged have different types, throw an exception."""
-        entity_id = data.draw(st.text())
-        entity_datas = data.draw(
-            st.lists(
-                st.builds(EntityData, entity_id=st.just(entity_id)),
-                min_size=2,
-                unique_by=lambda a: a.type,
-            )
-        )
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_sessions_derived_from_facts_and_refs(
+        self, entity_id, entity, session_facts
+    ):
+        """sessions_appeared contains exactly the unique source_session values."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
 
-        try:
-            _result: EntityData = merge_entity_data(entity_datas)
-        except EntityDataMergeIncompatibility:
-            pass
-        else:
-            assert False
-
-    @given(st.data())
-    def test_first_appearance_selected(self, data):
-        """Select the minimum as the first appearance."""
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        first_appearance = data.draw(st.integers(min_value=0))
-        min_entity_data = data.draw(
-            st.builds(
-                EntityData,
-                entity_id=st.just(entity_id),
-                type=st.just(entity_type),
-                first_appearance=st.just(first_appearance),
-            )
-        )
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData,
-                    entity_id=st.just(entity_id),
-                    type=st.just(entity_type),
-                    first_appearance=st.integers(min_value=first_appearance),
-                ),
-                min_size=2,
-            )
-        )
-        all_entity_data = data.draw(st.permutations([min_entity_data] + entity_data))
-
-        result: EntityData = merge_entity_data(all_entity_data)
-
-        assert result.first_appearance == first_appearance
-
-    @given(st.data())
-    def test_all_facts_collected(self, data):
-        entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
-
-        result: EntityData = merge_entity_data(entity_data)
-
-        def tupleize(
-            fact: AggregatedFact,
-        ) -> tuple[str, str, ConfidenceLevel, str, int]:
-            return (
-                fact.text,
-                fact.category,
-                fact.confidence,
-                ",".join(fact.object_entities),
-                fact.source_session,
-            )
-
-        assert {tupleize(fact) for fact in result.facts} == {
-            tupleize(fact) for entity in entity_data for fact in entity.facts
+        expected_sessions = {f.source_session for sf in session_facts for f in sf.facts}
+        expected_sessions |= {
+            r.source_session for sf in session_facts for r in sf.referenced_by
         }
+        assert set(result.sessions_appeared) == expected_sessions
+
+    @given(st.text(), st.builds(Entity), st.lists(st.builds(SessionEntityFacts)))
+    def test_sessions_sorted(self, entity_id, entity, session_facts):
+        """sessions_appeared is sorted in ascending order."""
+        result: EntityData = merge_session_facts(entity_id, entity, session_facts)
+
+        assert result.sessions_appeared == sorted(result.sessions_appeared)
+
+    @given(st.text(), st.builds(Entity))
+    def test_empty_session_facts(self, entity_id, entity):
+        """Empty session_facts list produces empty facts, refs, and sessions."""
+        result: EntityData = merge_session_facts(entity_id, entity, [])
+
+        assert result.facts == []
+        assert result.referenced_by == []
+        assert result.sessions_appeared == []
 
     @given(st.data())
-    def test_all_references_collected(self, data):
+    def test_facts_order_preserved_within_session(self, data):
+        """Facts within each SessionEntityFacts preserve their order."""
         entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
+        entity = data.draw(st.builds(Entity))
+        facts1 = data.draw(st.lists(st.builds(AggregatedFact), min_size=1))
+        facts2 = data.draw(st.lists(st.builds(AggregatedFact), min_size=1))
+        sf1 = SessionEntityFacts(entity_id=entity_id, facts=facts1, referenced_by=[])
+        sf2 = SessionEntityFacts(entity_id=entity_id, facts=facts2, referenced_by=[])
 
-        result: EntityData = merge_entity_data(entity_data)
+        result: EntityData = merge_session_facts(entity_id, entity, [sf1, sf2])
 
-        def tupleize(ref: Reference) -> tuple[str, str, int]:
-            return (
-                ref.source_entity,
-                ref.fact_text,
-                ref.source_session,
-            )
-
-        assert {tupleize(ref) for ref in result.referenced_by} == {
-            tupleize(ref) for entity in entity_data for ref in entity.referenced_by
-        }
+        # Facts from sf1 should appear before facts from sf2
+        assert result.facts == facts1 + facts2
 
     @given(st.data())
-    def test_all_session_appearances_collected(self, data):
+    def test_references_order_preserved_within_session(self, data):
+        """References within each SessionEntityFacts preserve their order."""
         entity_id = data.draw(st.text())
-        entity_type = data.draw(st.text())
-        entity_data = data.draw(
-            st.lists(
-                st.builds(
-                    EntityData, entity_id=st.just(entity_id), type=st.just(entity_type)
-                ),
-                min_size=2,
-            )
-        )
+        entity = data.draw(st.builds(Entity))
+        refs1 = data.draw(st.lists(st.builds(Reference), min_size=1))
+        refs2 = data.draw(st.lists(st.builds(Reference), min_size=1))
+        sf1 = SessionEntityFacts(entity_id=entity_id, facts=[], referenced_by=refs1)
+        sf2 = SessionEntityFacts(entity_id=entity_id, facts=[], referenced_by=refs2)
 
-        result: EntityData = merge_entity_data(entity_data)
+        result: EntityData = merge_session_facts(entity_id, entity, [sf1, sf2])
 
-        assert set(result.sessions_appeared) == {
-            session for entity in entity_data for session in entity.sessions_appeared
-        }
+        # Refs from sf1 should appear before refs from sf2
+        assert result.referenced_by == refs1 + refs2

@@ -4,10 +4,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from wikify.aggregation.merge import merge_entity_data
-from wikify.aggregation.split import all_entity_data_for_session
+from wikify.aggregation.errors import EntityMismatchError, EntityNotFoundError
+from wikify.aggregation.merge import merge_session_facts
+from wikify.aggregation.split import all_session_facts
 from wikify.git.registry import get_data_repo_path
-from wikify.models.entity import Entity, EntityData
+from wikify.models.entity import Entity, SessionEntityFacts
 from wikify.models.extraction import ExtractionResult
 from wikify.models.registry import Registry
 
@@ -47,17 +48,17 @@ def split_action(target: list[Any], source: list[Any], env: Any) -> int:
     # Load extraction result
     extraction = ExtractionResult.model_validate_json(source_path.read_text())
 
-    # Get all entity data for this session
-    entity_data_list = all_entity_data_for_session(extraction)
+    # Get all session facts for this session
+    session_facts_list = all_session_facts(extraction)
 
     # Create target directory (parent of the marker file)
     target_dir = target_path.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write each entity's data to its own file
-    for entity_data in entity_data_list:
-        entity_file = target_dir / f"{entity_data.entity_id}.json"
-        entity_file.write_text(entity_data.model_dump_json(indent=2))
+    # Write each entity's facts to its own file
+    for session_facts in session_facts_list:
+        entity_file = target_dir / f"{session_facts.entity_id}.json"
+        entity_file.write_text(session_facts.model_dump_json(indent=2))
 
     # Write marker file to signal completion
     target_path.write_text("")
@@ -77,20 +78,30 @@ def merge_action(target: list[Any], source: list[Any], env: Any) -> int:
         0 on success, non-zero on failure
     """
     target_path = Path(str(target[0]))
+    entity_id = target_path.stem  # e.g., "baron-aldric"
 
-    # Load all source EntityData files
-    # Sources are expected to be sorted by session number already
-    data_list = [
-        EntityData.model_validate_json(Path(str(s)).read_text()) for s in source
+    # Load registry for entity metadata
+    registry_path = get_data_repo_path() / "entity-registry.json"
+    registry = Registry.model_validate_json(registry_path.read_text())
+    entity = registry.get_entity(entity_id)
+    if entity is None:
+        raise EntityNotFoundError(entity_id)
+
+    # Load all session facts
+    session_facts = [
+        SessionEntityFacts.model_validate_json(Path(str(s)).read_text()) for s in source
     ]
 
-    # Merge into single EntityData
-    merged = merge_entity_data(data_list)
+    # Validate all session facts are for the expected entity
+    for sf in session_facts:
+        if sf.entity_id != entity_id:
+            raise EntityMismatchError(entity_id, sf.entity_id)
 
-    # Write output
+    # Merge into EntityData
+    merged = merge_session_facts(entity_id, entity, session_facts)
+
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(merged.model_dump_json(indent=2))
-
     return 0
 
 
