@@ -89,7 +89,7 @@ sessions_dir = data_path / "entities" / "sessions"
 entity_data_dir = data_path / "entities" / "data"
 
 session_num = GetOption("session")
-if session_num:
+if session_num is not None:
     # Extraction
     raw_source = data_path / "sessions" / "raw" / f"session-{session_num:03d}.txt"
     extraction_target = data_path / "sessions" / "extracted" / f"session-{session_num:03d}.json"
