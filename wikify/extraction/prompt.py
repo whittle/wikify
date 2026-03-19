@@ -20,10 +20,6 @@ def build_extraction_prompt(session: str, registry: Registry) -> str:
 You are a fact extractor for a tabletop RPG knowledge base. Your task is to \
 extract structured facts from session notes.
 
-## Known Entities
-
-{known_entities_section}
-
 ## Output Format
 
 Return a JSON object with these fields:
@@ -91,11 +87,18 @@ events, etc.)
 5. Include object_entities for any entities mentioned in the fact
 6. Document context resolutions for pronouns or descriptive references
 
+## Known Entities
+
+{known_entities_section}
+
 ## Session Notes
 
 {session}
 
-Return only the JSON object, no additional text."""
+## Final Instructions
+
+Return only the JSON object, no additional text.
+"""
 
 
 def _stringify_known_entity(entity_id: str, entity: Entity) -> str:
@@ -107,7 +110,7 @@ def _stringify_known_entity(entity_id: str, entity: Entity) -> str:
     if entity.description:
         description_str = f" {entity.description}"
 
-    return f"- `{entity_id}`: [{entity.type}] **{entity.canonical_name}**{description_str}{aliases_str}"
+    return f"- `{entity_id}` [{entity.type}]: **{entity.canonical_name}**{description_str}{aliases_str}"
 
 
 def _build_known_entities_section(registry: Registry) -> str:
@@ -115,9 +118,11 @@ def _build_known_entities_section(registry: Registry) -> str:
     if not registry.entities:
         return "No entities are known yet."
 
+    format_note = "ENTITY FORMAT:\n- `entity_id` [type]: **Canonical Name** optional description (aliases: optional)\n\n"
+
     lines = [
         _stringify_known_entity(entity_id, entity)
         for entity_id, entity in registry.entities.items()
     ]
 
-    return "\n".join(lines)
+    return format_note + "\n".join(lines)
