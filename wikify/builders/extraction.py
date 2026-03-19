@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from wikify.extraction import extract_session
+from wikify.extraction.prompt import build_extraction_prompt
 from wikify.git.registry import get_data_repo_path
 from wikify.llm.client import AnthropicClient
 from wikify.models.registry import Registry
@@ -54,6 +55,17 @@ def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
         registry = Registry.model_validate_json(registry_path.read_text())
     else:
         registry = Registry()
+
+    # Build and persist prompt
+    prompt = build_extraction_prompt(session_text, registry)
+    prompt_path = (
+        get_data_repo_path()
+        / "sessions"
+        / "prompts"
+        / f"session-{session_number:03d}.txt"
+    )
+    prompt_path.parent.mkdir(parents=True, exist_ok=True)
+    prompt_path.write_text(prompt)
 
     # Create LLM client and extract
     client = AnthropicClient()

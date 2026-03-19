@@ -97,6 +97,7 @@ wikify/
   data/               # Git submodule (github.com/whittle/aral)
     sessions/
       raw/            # Input: session-001.txt, session-002.txt, ...
+      prompts/        # Output: session-001.txt (full interpolated prompt)
       extracted/      # Output: session-001.json, session-002.json, ...
     entities/
       sessions/       # Intermediate: per-entity-per-session data
@@ -159,11 +160,14 @@ Sessions must be extracted in order. Session N benefits from entities discovered
 
 ```
 session-NNN.txt + registry → session-NNN.json (LLM extraction)
+                           → sessions/prompts/session-NNN.txt (side effect: persisted prompt)
 session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split)
 session-NNN.json → entity-registry.json (mechanical register, updates with discovered entities)
 entities/sessions/*/entity-id.json → entities/data/entity-id.json (mechanical merge)
 entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ```
+
+The extraction step persists the full interpolated prompt (session text + known entities) to `sessions/prompts/` for debugging and reproducibility.
 
 The register step merges newly discovered and changed entities from extractions
 into the registry. This enables "Session N benefits from entities discovered in
