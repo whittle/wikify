@@ -78,7 +78,7 @@ def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
 
     # Create LLM client and extract
     client = AnthropicClient()
-    result = extract_session(session_text, session_number, registry, client)
+    result = extract_session(prompt, session_number, client)
 
     # Write output
     target_path.parent.mkdir(parents=True, exist_ok=True)

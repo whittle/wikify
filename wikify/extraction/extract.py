@@ -5,34 +5,30 @@ from datetime import datetime, timezone
 from wikify.git.registry import get_data_repo_commit_sha
 from wikify.llm.client import LLMClient
 from wikify.models.extraction import ExtractedEntity, ExtractionResult
-from wikify.models.registry import Registry
 
 from .parser import parse_extraction_response
-from .prompt import build_extraction_prompt
 
 EXTRACTOR_VERSION = "0.1.0"
 
 
 def extract_session(
-    session: str,
+    prompt: str,
     session_number: int,
-    registry: Registry,
     client: LLMClient,
 ) -> ExtractionResult:
     """Extract facts from session notes.
 
     Orchestrates the full extraction workflow:
     1. Verify registry is clean via get_data_repo_commit_sha()
-    2. Build prompt from session text and registry
-    3. Call LLM to generate extraction
-    4. Parse response into structured data
-    5. Convert RawExtractedEntity → ExtractedEntity (set first_appearance)
-    6. Assemble ExtractionResult with metadata
+    2. Call LLM with provided prompt
+    3. Parse response into structured data
+    4. Convert RawExtractedEntity → ExtractedEntity (set first_appearance)
+    5. Assemble ExtractionResult with metadata
 
     Args:
-        session: Raw session text to extract facts from
+        prompt: The fully-built extraction prompt (including session text,
+            registry entities, and optional context)
         session_number: The session number (e.g., 7 for session-007.txt)
-        registry: Entity registry with known entities
         client: LLM client for generating extraction
 
     Returns:
@@ -46,10 +42,7 @@ def extract_session(
     # Step 1: Verify registry is clean and get commit SHA
     registry_commit = get_data_repo_commit_sha()
 
-    # Step 2: Build prompt
-    prompt = build_extraction_prompt(session, registry)
-
-    # Step 3: Call LLM
+    # Step 2: Call LLM
     raw_response = client.complete(prompt)
 
     # Step 4: Parse response

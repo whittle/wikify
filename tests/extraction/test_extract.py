@@ -11,7 +11,6 @@ from wikify.extraction.extract import EXTRACTOR_VERSION, extract_session
 from wikify.git.errors import DirtyRegistryError
 from wikify.llm.client import MockLLMClient
 from wikify.models.extraction import ExtractionResult
-from wikify.models.registry import Registry
 
 
 class TestExtractSession:
@@ -27,12 +26,10 @@ class TestExtractSession:
             {"context_resolutions": [], "entities": [], "facts": []}
         )
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
 
         result = extract_session(
-            session="The party entered the dungeon.",
+            prompt="Extract facts from: The party entered the dungeon.",
             session_number=7,
-            registry=registry,
             client=client,
         )
 
@@ -49,13 +46,11 @@ class TestExtractSession:
             "entity-registry.json has uncommitted changes"
         )
         client = MockLLMClient()
-        registry = Registry()
 
         with pytest.raises(DirtyRegistryError):
             extract_session(
-                session="The party entered the dungeon.",
+                prompt="Extract facts from: The party entered the dungeon.",
                 session_number=7,
-                registry=registry,
                 client=client,
             )
 
@@ -64,13 +59,11 @@ class TestExtractSession:
         """InvalidJSONError from parser flows through."""
         mock_get_sha.return_value = "abc123"
         client = MockLLMClient(responses={"": "not valid json"})
-        registry = Registry()
 
         with pytest.raises(InvalidJSONError):
             extract_session(
-                session="The party entered the dungeon.",
+                prompt="Extract facts from: The party entered the dungeon.",
                 session_number=7,
-                registry=registry,
                 client=client,
             )
 
@@ -81,13 +74,11 @@ class TestExtractSession:
         # Missing required fields in fact
         mock_response = json.dumps({"facts": [{"subject_entity": "Baron"}]})
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
 
         with pytest.raises(SchemaValidationError):
             extract_session(
-                session="The party entered the dungeon.",
+                prompt="Extract facts from: The party entered the dungeon.",
                 session_number=7,
-                registry=registry,
                 client=client,
             )
 
@@ -118,12 +109,10 @@ class TestExtractSession:
             }
         )
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
 
         result = extract_session(
-            session="Sera guided the party to Mount Tambora.",
+            prompt="Extract facts from: Sera guided the party to Mount Tambora.",
             session_number=5,
-            registry=registry,
             client=client,
         )
 
@@ -153,12 +142,10 @@ class TestExtractSession:
             }
         )
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
 
         result = extract_session(
-            session="The Baron welcomed us to his keep.",
+            prompt="Extract facts from: The Baron welcomed us to his keep.",
             session_number=3,
-            registry=registry,
             client=client,
         )
 
@@ -177,13 +164,11 @@ class TestExtractSession:
             {"context_resolutions": [], "entities": [], "facts": []}
         )
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
 
         before = datetime.now(timezone.utc)
         result = extract_session(
-            session="Test session.",
+            prompt="Extract facts from: Test session.",
             session_number=1,
-            registry=registry,
             client=client,
         )
         after = datetime.now(timezone.utc)
@@ -192,22 +177,20 @@ class TestExtractSession:
         assert before <= result.extracted_at <= after
 
     @patch("wikify.extraction.extract.get_data_repo_commit_sha")
-    def test_calls_llm_with_built_prompt(self, mock_get_sha: MagicMock) -> None:
-        """LLM is called with a prompt containing the session text."""
+    def test_passes_prompt_to_llm_unchanged(self, mock_get_sha: MagicMock) -> None:
+        """LLM is called with the exact prompt that was passed in."""
         mock_get_sha.return_value = "abc123"
         mock_response = json.dumps(
             {"context_resolutions": [], "entities": [], "facts": []}
         )
         client = MockLLMClient(responses={"": mock_response})
-        registry = Registry()
-        session_text = "The dragon attacked the village."
+        prompt = "This is a complete prompt with context and session text."
 
         extract_session(
-            session=session_text,
+            prompt=prompt,
             session_number=1,
-            registry=registry,
             client=client,
         )
 
         assert len(client.calls) == 1
-        assert session_text in client.calls[0]
+        assert client.calls[0] == prompt
