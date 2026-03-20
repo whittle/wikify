@@ -92,6 +92,8 @@ events, etc.)
 4. Be precise about confidence levels - don't upgrade rumors to stated facts
 5. Include object_entities for any entities mentioned in the fact
 6. Document context resolutions for pronouns or descriptive references
+7. Do not include articles (a, the) at the start of entity names, aliases, or entity_ids
+8. Context resolution references may include an article (a, the) at their start
 
 ## Known Entities
 
