@@ -56,8 +56,17 @@ def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
     else:
         registry = Registry()
 
+    # Check for optional context file
+    context_path = (
+        get_data_repo_path()
+        / "sessions"
+        / "context"
+        / f"session-{session_number:03d}.txt"
+    )
+    context = context_path.read_text() if context_path.exists() else None
+
     # Build and persist prompt
-    prompt = build_extraction_prompt(session_text, registry)
+    prompt = build_extraction_prompt(session_text, registry, context)
     prompt_path = (
         get_data_repo_path()
         / "sessions"

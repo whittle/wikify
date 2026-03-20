@@ -63,7 +63,7 @@ wikify/
       registry.py     # Registry, AliasIndex
 
     extraction/       # Session → structured facts
-      prompt.py       # build_extraction_prompt(session, registry) -> str
+      prompt.py       # build_extraction_prompt(session, registry, context?) -> str
       parser.py       # parse_extraction_response(raw) -> ExtractionResult
       extract.py      # extract_session(session, registry, client) -> ExtractionResult
 
@@ -102,6 +102,7 @@ wikify/
   data/               # Git submodule (github.com/whittle/aral)
     sessions/
       raw/            # Input: session-001.txt, session-002.txt, ...
+      context/        # Optional: session-001.txt (context hints for extraction)
       prompts/        # Output: session-001.txt (full interpolated prompt)
       extracted/      # Output: session-001.json, session-002.json, ...
     entities/
@@ -267,19 +268,17 @@ def test_includes_all_subject_entities(data):
 
 ## Session Context Hints
 
-When session notes have ambiguous references, prepend natural language context:
+When session notes have ambiguous references, create a context file at `data/sessions/context/session-NNN.txt`. The extraction builder automatically checks for this file and inserts its contents into the prompt between "Known Entities" and "Session Notes".
+
+Example context file:
 
 ```
-[CONTEXT FOR THIS SESSION]
 This session takes place on Mount Tambora, referred to throughout as
 "the mountain." The party is accompanied by Sera (the ranger from
 session 5).
-
-[SESSION 7 NOTES BEGIN]
-We set off at dawn...
 ```
 
-Use natural language, not YAML or structured formats.
+Use natural language, not YAML or structured formats. Context files are optional—if absent, extraction proceeds without a context section.
 
 ## Key Design Decisions
 

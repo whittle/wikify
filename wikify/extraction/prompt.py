@@ -1,20 +1,26 @@
 """Prompt builder for fact extraction."""
 
+from typing import Optional
+
 from wikify.models.entity import Entity
 from wikify.models.registry import Registry
 
 
-def build_extraction_prompt(session: str, registry: Registry) -> str:
+def build_extraction_prompt(
+    session: str, registry: Registry, context: Optional[str] = None
+) -> str:
     """Build LLM prompt for fact extraction from session notes.
 
     Args:
         session: Raw session text to extract facts from
         registry: Entity registry with known entities
+        context: Optional session context hints
 
     Returns:
         Complete prompt string for the LLM
     """
     known_entities_section = _build_known_entities_section(registry)
+    context_section = _build_context_section(context)
 
     return f"""\
 You are a fact extractor for a tabletop RPG knowledge base. Your task is to \
@@ -90,7 +96,7 @@ events, etc.)
 ## Known Entities
 
 {known_entities_section}
-
+{context_section}
 ## Session Notes
 
 {session}
@@ -126,3 +132,16 @@ def _build_known_entities_section(registry: Registry) -> str:
     ]
 
     return format_note + "\n".join(lines)
+
+
+def _build_context_section(context: Optional[str]) -> str:
+    """Build the optional context section of the prompt."""
+    if context is None:
+        return ""
+
+    return f"""
+## Session Context
+
+{context}
+
+"""

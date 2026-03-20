@@ -4,4 +4,3 @@
 [ ] object references should be eliminated in favor of an unordered list of subjects; this also allows removal of references
 [ ] Implement article generation
 [ ] Does first appearance still provide value?
-[ ] Add handling of session-NNN.context.txt files.

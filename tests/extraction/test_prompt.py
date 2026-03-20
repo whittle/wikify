@@ -87,6 +87,42 @@ class TestBuildExtractionPrompt:
         assert session in result
         assert isinstance(result, str)
 
+    def test_context_none_produces_same_structure(self) -> None:
+        """context=None produces prompt without Session Context section."""
+        session = "The party rested."
+        registry = Registry()
+
+        result = build_extraction_prompt(session, registry, context=None)
+
+        assert "## Session Context" not in result
+        assert "## Known Entities" in result
+        assert "## Session Notes" in result
+
+    def test_context_inserted_with_header(self) -> None:
+        """Context string is inserted with proper header."""
+        session = "We climbed the mountain."
+        registry = Registry()
+        context = "The mountain refers to Mount Tambora."
+
+        result = build_extraction_prompt(session, registry, context=context)
+
+        assert "## Session Context" in result
+        assert "The mountain refers to Mount Tambora." in result
+
+    def test_context_appears_between_entities_and_session(self) -> None:
+        """Context section appears between Known Entities and Session Notes."""
+        session = "We met the Baron."
+        registry = Registry()
+        context = "The Baron is Baron Aldric from session 1."
+
+        result = build_extraction_prompt(session, registry, context=context)
+
+        entities_pos = result.find("## Known Entities")
+        context_pos = result.find("## Session Context")
+        session_pos = result.find("## Session Notes")
+
+        assert entities_pos < context_pos < session_pos
+
 
 # Property-based tests
 

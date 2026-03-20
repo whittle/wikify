@@ -196,3 +196,125 @@ class TestExtractAction:
         assert "baron-aldric" in prompt_content
         assert "Baron Aldric" in prompt_content
         assert "the Baron" in prompt_content
+
+    @patch("wikify.builders.extraction.AnthropicClient")
+    @patch("wikify.builders.extraction.extract_session")
+    @patch("wikify.builders.extraction.get_data_repo_path")
+    def test_missing_context_file_works(
+        self,
+        mock_get_data_repo_path: MagicMock,
+        mock_extract_session: MagicMock,
+        mock_anthropic_client: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Extraction works when context file does not exist."""
+        # Setup data repo structure
+        data_repo = tmp_path / "data"
+        sessions_raw = data_repo / "sessions" / "raw"
+        sessions_raw.mkdir(parents=True)
+        sessions_extracted = data_repo / "sessions" / "extracted"
+        sessions_extracted.mkdir(parents=True)
+
+        mock_get_data_repo_path.return_value = data_repo
+
+        # Create session file (no context file)
+        session_file = sessions_raw / "session-005.txt"
+        session_file.write_text("The party explored.")
+
+        # Create target file path
+        target_file = sessions_extracted / "session-005.json"
+
+        # Mock extraction result
+        from wikify.models.extraction import ExtractionResult
+
+        mock_result = ExtractionResult(
+            session_number=5,
+            extracted_at=datetime.fromisoformat("2024-01-01T00:00:00Z"),
+            registry_commit="abc123",
+            extractor_version="1.0.0",
+            context_resolutions=[],
+            entities=[],
+            facts=[],
+        )
+        mock_extract_session.return_value = mock_result
+
+        # Create mock SCons nodes
+        source_node = MagicMock()
+        source_node.__str__ = MagicMock(return_value=str(session_file))
+        target_node = MagicMock()
+        target_node.__str__ = MagicMock(return_value=str(target_file))
+
+        # Run action
+        result = extract_action([target_node], [source_node], env=None)
+
+        assert result == 0
+
+        # Verify prompt file exists and does not have context section
+        prompt_file = data_repo / "sessions" / "prompts" / "session-005.txt"
+        prompt_content = prompt_file.read_text()
+        assert "## Session Context" not in prompt_content
+
+    @patch("wikify.builders.extraction.AnthropicClient")
+    @patch("wikify.builders.extraction.extract_session")
+    @patch("wikify.builders.extraction.get_data_repo_path")
+    def test_context_file_is_read_and_included(
+        self,
+        mock_get_data_repo_path: MagicMock,
+        mock_extract_session: MagicMock,
+        mock_anthropic_client: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Context file content is included in the prompt."""
+        # Setup data repo structure
+        data_repo = tmp_path / "data"
+        sessions_raw = data_repo / "sessions" / "raw"
+        sessions_raw.mkdir(parents=True)
+        sessions_extracted = data_repo / "sessions" / "extracted"
+        sessions_extracted.mkdir(parents=True)
+        sessions_context = data_repo / "sessions" / "context"
+        sessions_context.mkdir(parents=True)
+
+        mock_get_data_repo_path.return_value = data_repo
+
+        # Create session file
+        session_file = sessions_raw / "session-012.txt"
+        session_file.write_text("We climbed the mountain at dawn.")
+
+        # Create context file
+        context_file = sessions_context / "session-012.txt"
+        context_text = "The mountain refers to Mount Tambora from session 3."
+        context_file.write_text(context_text)
+
+        # Create target file path
+        target_file = sessions_extracted / "session-012.json"
+
+        # Mock extraction result
+        from wikify.models.extraction import ExtractionResult
+
+        mock_result = ExtractionResult(
+            session_number=12,
+            extracted_at=datetime.fromisoformat("2024-01-01T00:00:00Z"),
+            registry_commit="abc123",
+            extractor_version="1.0.0",
+            context_resolutions=[],
+            entities=[],
+            facts=[],
+        )
+        mock_extract_session.return_value = mock_result
+
+        # Create mock SCons nodes
+        source_node = MagicMock()
+        source_node.__str__ = MagicMock(return_value=str(session_file))
+        target_node = MagicMock()
+        target_node.__str__ = MagicMock(return_value=str(target_file))
+
+        # Run action
+        result = extract_action([target_node], [source_node], env=None)
+
+        assert result == 0
+
+        # Verify prompt file includes context
+        prompt_file = data_repo / "sessions" / "prompts" / "session-012.txt"
+        prompt_content = prompt_file.read_text()
+        assert "## Session Context" in prompt_content
+        assert context_text in prompt_content

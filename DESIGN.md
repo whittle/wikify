@@ -88,6 +88,8 @@ No need to reprocess the entire corpus for routine updates.
     /raw/                    # Original session notes (input)
       session-001.txt
       session-002.txt
+    /context/                # Optional context hints (input)
+      session-007.txt        # Only sessions needing disambiguation
     /extracted/              # LLM-extracted facts
       session-001.json
       session-002.json
@@ -608,17 +610,17 @@ Rendering is embarrassingly parallel — each entity can be rendered independent
 
 ## Session Context Hints
 
-When session notes use ambiguous contextual references, you can prepend hints to help the extraction LLM:
+When session notes use ambiguous contextual references, create a context file at `sessions/context/session-{NNN}.txt`. The extraction builder automatically checks for this file and inserts its contents into the prompt between "Known Entities" and "Session Notes".
+
+Example context file:
 
 ```
-[CONTEXT FOR THIS SESSION]
 This session takes place on Mount Tambora, referred to throughout as
 "the mountain." The party is accompanied by Sera (the ranger from
 session 5) and still carrying the Queensbane sword.
-
-[SESSION 7 NOTES BEGIN]
-We set off at dawn, making our way up the eastern slope...
 ```
+
+Context files are optional—if absent, extraction proceeds without a context section.
 
 Natural language hints work better than structured formats (like YAML front-matter) because:
 - They match the register of the session notes
