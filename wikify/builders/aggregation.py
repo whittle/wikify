@@ -8,9 +8,7 @@ from wikify.aggregation.errors import EntityMismatchError, EntityNotFoundError
 from wikify.aggregation.merge import merge_session_facts
 from wikify.aggregation.split import all_session_facts
 from wikify.git.registry import get_data_repo_path
-from wikify.models.entity import Entity, SessionEntityFacts
-from wikify.models.extraction import ExtractionResult
-from wikify.models.registry import Registry
+from wikify.models import Entity, ExtractionResult, Registry, SessionEntityFacts
 
 
 def parse_session_number_from_json(filename: str) -> int:

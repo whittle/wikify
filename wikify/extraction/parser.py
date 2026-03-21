@@ -6,8 +6,7 @@ from json import JSONDecodeError
 
 from pydantic import BaseModel, ValidationError
 
-from wikify.models.extraction import ContextResolution
-from wikify.models.fact import Fact
+from wikify.models import ContextResolution, Fact
 
 from .errors import InvalidJSONError, SchemaValidationError
 

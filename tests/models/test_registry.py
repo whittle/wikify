@@ -2,7 +2,8 @@
 
 from hypothesis import given, strategies as st
 
-from wikify.models import Entity, Registry
+from wikify.models.entity import Entity
+from wikify.models.registry import Registry
 
 
 def normalize_entity(entity: Entity) -> Entity:

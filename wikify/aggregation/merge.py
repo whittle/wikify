@@ -1,6 +1,6 @@
 """Procedures for merging entity session data."""
 
-from wikify.models.entity import Entity, EntityData, SessionEntityFacts
+from wikify.models import Entity, EntityData, SessionEntityFacts
 
 
 def merge_session_facts(

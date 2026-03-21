@@ -4,7 +4,7 @@ import copy
 
 from hypothesis import given, strategies as st
 
-from wikify.models import Entity
+from wikify.models.entity import Entity
 
 
 def normalize_entity(entity: Entity) -> Entity:

@@ -10,7 +10,7 @@ from wikify.extraction.errors import InvalidJSONError, SchemaValidationError
 from wikify.extraction.extract import EXTRACTOR_VERSION, extract_session
 from wikify.git.errors import DirtyRegistryError
 from wikify.llm.client import MockLLMClient
-from wikify.models.extraction import ExtractionResult
+from wikify.models import ExtractionResult
 
 
 class TestExtractSession:

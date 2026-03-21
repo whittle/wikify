@@ -1,4 +1,4 @@
-from .aggregation import merge_action, split_action
+from .aggregation import merge_action, register_action, split_action
 from .extraction import extract_action
 
-__all__ = ["extract_action", "merge_action", "split_action"]
+__all__ = ["extract_action", "merge_action", "register_action", "split_action"]

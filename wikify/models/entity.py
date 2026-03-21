@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from .fact import ConfidenceLevel
+from .fact import AggregatedFact, Reference
 
 
 class Entity(BaseModel):
@@ -52,24 +52,6 @@ class Entity(BaseModel):
             return None
         else:
             return "".join([a or "" for a in opts])
-
-
-class AggregatedFact(BaseModel):
-    """A fact with source session information."""
-
-    text: str
-    category: str
-    confidence: ConfidenceLevel
-    object_entities: list[str]
-    source_session: int
-
-
-class Reference(BaseModel):
-    """A reference to this entity from another entity's fact."""
-
-    source_entity: str
-    fact_text: str
-    source_session: int
 
 
 class SessionEntityFacts(BaseModel):

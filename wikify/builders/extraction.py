@@ -4,11 +4,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from wikify.extraction import extract_session
-from wikify.extraction.prompt import build_extraction_prompt
+from wikify.extraction import build_extraction_prompt, extract_session
 from wikify.git.registry import get_data_repo_path
 from wikify.llm.client import AnthropicClient
-from wikify.models.registry import Registry
+from wikify.models import Registry
 
 
 def parse_session_number(filename: str) -> int:

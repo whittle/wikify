@@ -1,8 +1,12 @@
 """Procedures for splitting an extraction into per-entity-per-session data."""
 
-from wikify.models.entity import AggregatedFact, Reference, SessionEntityFacts
-from wikify.models.extraction import ExtractionResult
-from wikify.models.fact import Fact
+from wikify.models import (
+    AggregatedFact,
+    ExtractionResult,
+    Fact,
+    Reference,
+    SessionEntityFacts,
+)
 
 
 def aggregate_fact(fact: Fact, session_num: int) -> AggregatedFact:

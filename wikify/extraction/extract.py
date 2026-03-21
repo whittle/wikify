@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from wikify.git.registry import get_data_repo_commit_sha
 from wikify.llm.client import LLMClient
-from wikify.models.extraction import ExtractedEntity, ExtractionResult
+from wikify.models import ExtractedEntity, ExtractionResult
 
 from .parser import parse_extraction_response
 

@@ -2,7 +2,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from wikify.aggregation.merge import merge_session_facts
-from wikify.models.entity import (
+from wikify.models import (
     AggregatedFact,
     Entity,
     EntityData,

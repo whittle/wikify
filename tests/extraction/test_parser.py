@@ -12,7 +12,7 @@ from wikify.extraction.parser import (
     _strip_code_fences,
     parse_extraction_response,
 )
-from wikify.models.fact import ConfidenceLevel
+from wikify.models import ConfidenceLevel
 
 
 # Hypothesis strategies for property-based tests

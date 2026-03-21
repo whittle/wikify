@@ -10,8 +10,7 @@ import pytest
 from hypothesis import strategies as st
 from hypothesis.errors import NonInteractiveExampleWarning
 
-from wikify.models.entity import Entity
-from wikify.models.registry import Registry
+from wikify.models import Entity, Registry
 
 # Strategy for generating arbitrary registries
 

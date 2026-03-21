@@ -3,8 +3,7 @@ from typing import Any
 
 from SCons.Script import Builder
 
-from .builders.aggregation import merge_action, register_action, split_action
-from .builders.extraction import extract_action
+from .builders import extract_action, merge_action, register_action, split_action
 from .config import global_config
 from .git.registry import get_data_repo_path
 

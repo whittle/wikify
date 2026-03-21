@@ -2,8 +2,7 @@
 
 from typing import Optional
 
-from wikify.models.entity import Entity
-from wikify.models.registry import Registry
+from wikify.models import Entity, Registry
 
 
 def build_extraction_prompt(

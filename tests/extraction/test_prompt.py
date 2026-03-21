@@ -4,8 +4,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from wikify.extraction.prompt import build_extraction_prompt
-from wikify.models.entity import Entity
-from wikify.models.registry import Registry
+from wikify.models import Entity, Registry
 
 
 class TestBuildExtractionPrompt:

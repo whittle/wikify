@@ -26,3 +26,21 @@ class Fact(BaseModel):
     text: str  # The fact itself
     category: str  # history, abilities, geography, etc.
     confidence: ConfidenceLevel
+
+
+class AggregatedFact(BaseModel):
+    """A fact with source session information."""
+
+    text: str
+    category: str
+    confidence: ConfidenceLevel
+    object_entities: list[str]
+    source_session: int
+
+
+class Reference(BaseModel):
+    """A reference to this entity from another entity's fact."""
+
+    source_entity: str
+    fact_text: str
+    source_session: int

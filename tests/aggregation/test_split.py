@@ -11,9 +11,14 @@ from wikify.aggregation.split import (
     reference_fact,
     session_facts_for_entity,
 )
-from wikify.models.entity import AggregatedFact, Reference, SessionEntityFacts
-from wikify.models.extraction import ExtractedEntity, ExtractionResult
-from wikify.models.fact import Fact
+from wikify.models import (
+    AggregatedFact,
+    ExtractedEntity,
+    ExtractionResult,
+    Fact,
+    Reference,
+    SessionEntityFacts,
+)
 
 
 class TestAggregateFact:
