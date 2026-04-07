@@ -7,7 +7,7 @@ from typing import Any
 from wikify.extraction import build_extraction_prompt, extract_session
 from wikify.git.registry import get_data_repo_path
 from wikify.llm.client import AnthropicClient
-from wikify.models import Registry
+from wikify.models import Registry, SessionResolution
 
 
 def parse_session_number(filename: str) -> int:
@@ -79,8 +79,19 @@ def extract_action(target: list[Any], source: list[Any], env: Any) -> int:
     client = AnthropicClient()
     result = extract_session(prompt, session_number, client)
 
-    # Write output
+    # Write extraction output
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(result.model_dump_json(indent=2))
+
+    # Generate pass-through resolution file
+    resolution = SessionResolution.generate_passthrough(result)
+    resolution_path = (
+        get_data_repo_path()
+        / "sessions"
+        / "resolver"
+        / f"session-{session_number:03d}.json"
+    )
+    resolution_path.parent.mkdir(parents=True, exist_ok=True)
+    resolution_path.write_text(resolution.model_dump_json(indent=2))
 
     return 0

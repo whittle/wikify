@@ -6,10 +6,11 @@ A tool for extracting structured knowledge from notes and generating Wikipedia-s
 
 A pipeline that:
 1. **Extracts** facts from session notes using an LLM
-2. **Splits** extractions into per-entity-per-session data files (mechanical)
-3. **Registers** newly discovered entities into the registry (mechanical)
-4. **Merges** entity-session files into per-entity data files (mechanical)
-5. **Renders** entity data into wiki articles using an LLM
+2. **Resolves** entity_ids through a resolution layer (mechanical, editable)
+3. **Splits** resolved extractions into per-entity-per-session data files (mechanical)
+4. **Registers** newly discovered entities into the registry (mechanical)
+5. **Merges** entity-session files into per-entity data files (mechanical)
+6. **Renders** entity data into wiki articles using an LLM
 
 All files are version-controlled. The build is managed by SCons.
 
@@ -60,6 +61,7 @@ wikify/
       fact.py         # Fact, ConfidenceLevel
       entity.py       # Entity, SessionEntityFacts, EntityData
       extraction.py   # ExtractionResult, ContextResolution
+      resolution.py   # SessionResolution, ResolvedExtraction
       registry.py     # Registry, AliasIndex
 
     extraction/       # Session → structured facts
@@ -68,6 +70,7 @@ wikify/
       extract.py      # extract_session(session, registry, client) -> ExtractionResult
 
     aggregation/      # Extractions → per-entity data
+      resolve.py      # load_resolved_extraction(extraction, resolution) -> ResolvedExtraction
       split.py        # all_session_facts(extraction) -> list[SessionEntityFacts]
       merge.py        # merge_session_facts(entity_id, entity, session_facts) -> EntityData
       errors.py       # EntityNotFoundError, EntityMismatchError
@@ -105,6 +108,7 @@ wikify/
       context/        # Optional: session-001.txt (context hints for extraction)
       prompts/        # Output: session-001.txt (full interpolated prompt)
       extracted/      # Output: session-001.json, session-002.json, ...
+      resolver/       # Output: session-001.json (entity_id resolution, editable)
     entities/
       sessions/       # Intermediate: SessionEntityFacts (facts only, no metadata)
         session-001/  #   baron-aldric.json, thornwood.json, ...
@@ -133,6 +137,28 @@ Models are defined in `wikify/models/`. Key types:
 - `context_resolutions`: List of reference→entity mappings for this session
 - `entities`: New entities discovered
 - `facts`: Extracted facts
+
+### SessionResolution (`wikify/models/resolution.py`)
+- Maps extracted `entity_id` → resolved `entity_id` (or `None` to exclude)
+- `session_number`: Session this resolution applies to
+- `generated_at`: When the resolution was created
+- `resolutions`: dict mapping extracted_id → resolved_id
+- `resolve(entity_id)`: Look up resolved ID (raises KeyError if not in map)
+- `generate_passthrough(extraction)`: Create identity mappings for all entity_ids
+
+Generated automatically as pass-through (id→id) during extraction. Edit manually to:
+- Correct typos: `"baron-aldrich"` → `"baron-aldric"`
+- Merge duplicates: `"mont-tambora"` → `"mount-tambora"`
+- Exclude entities: `"not-an-entity"` → `null`
+
+N.B. Every entity_id in the extraction must have a key in `resolutions`. A missing key causes a `KeyError` during aggregation; use `null` to intentionally exclude an entity.
+
+### ResolvedExtraction (`wikify/models/resolution.py`)
+- Result of applying `SessionResolution` to `ExtractionResult`
+- Input to split/register steps (contains only aggregation-relevant fields)
+- `session_number`, `entities`, `facts` (with translated entity_ids)
+- Excludes extraction-only fields: `extracted_at`, `registry_commit`, `extractor_version`, `context_resolutions`
+- `from_extraction_and_resolution(extraction, resolution)`: Apply resolution, merge entities resolving to same ID
 
 ### Registry (`wikify/models/registry.py`)
 - `entities`: dict mapping entity_id → Entity
@@ -174,13 +200,20 @@ Sessions must be extracted in order. Session N benefits from entities discovered
 ```
 session-NNN.txt + registry → session-NNN.json (LLM extraction)
                            → sessions/prompts/session-NNN.txt (side effect: persisted prompt)
-session-NNN.json → entities/sessions/session-NNN/*.json (mechanical split → SessionEntityFacts)
-session-NNN.json → entity-registry.json (mechanical register, updates with discovered entities)
+                           → sessions/resolver/session-NNN.json (side effect: pass-through resolution)
+session-NNN.json + resolution → entities/sessions/session-NNN/*.json (mechanical split → SessionEntityFacts)
+session-NNN.json + resolution → entity-registry.json (mechanical register, updates with discovered entities)
 entities/sessions/*/entity-id.json + registry → entities/data/entity-id.json (mechanical merge → EntityData)
 entities/data/entity-id.json → entities/articles/entity-id.md (LLM rendering)
 ```
 
-The extraction step persists the full interpolated prompt (session text + known entities) to `sessions/prompts/` for debugging and reproducibility.
+The extraction step persists:
+- The full interpolated prompt to `sessions/prompts/` for debugging and reproducibility
+- A pass-through resolution file to `sessions/resolver/` for entity_id correction
+
+The resolution file maps extracted entity_ids to resolved entity_ids. Initially generated
+as identity mappings (id→id), it can be edited to correct typos, merge duplicates, or
+exclude false entities. Changes to resolution files trigger rebuild of split/register/merge.
 
 The register step merges newly discovered and changed entities from extractions
 into the registry. This enables "Session N benefits from entities discovered in
@@ -335,7 +368,19 @@ Hooks configured in `.pre-commit-config.yaml`:
 1. Add `data/sessions/raw/session-NNN.txt`
 2. Run `scons --session=NNN`
 
-### Merge two entities
+### Merge two entities (via resolution)
+
+When the LLM extracted the same entity with different IDs across sessions:
+
+1. Edit `data/sessions/resolver/session-NNN.json` for each affected session
+2. Change the resolution: `"baron-aldrich": "baron-aldric"` (typo → canonical)
+3. Run `scons aggregate` (facts consolidate under the resolved ID)
+
+This approach preserves the original extraction and doesn't require re-running the LLM.
+
+### Merge two entities (via registry)
+
+When entities should be permanently merged going forward:
 
 1. Edit `data/entity-registry.json`: combine aliases under one canonical name, delete the other
 2. Commit the change
@@ -346,6 +391,14 @@ Hooks configured in `.pre-commit-config.yaml`:
 
 1. Edit `data/sessions/extracted/session-NNN.json` directly, or
 2. Delete it and re-run `scons --session=NNN` to re-extract
+
+### Correct entity_id mistakes
+
+If the LLM assigned wrong entity_ids (typos, duplicates, non-entities):
+
+1. Edit `data/sessions/resolver/session-NNN.json`
+2. Correct mappings: `"typo-name": "correct-name"` or `"not-an-entity": null`
+3. Run `scons aggregate`
 
 ### Change the extraction prompt
 

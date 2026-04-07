@@ -73,18 +73,36 @@ class TestSplitAction:
         extraction_file = extracted_dir / "session-005.json"
         extraction_file.write_text(json.dumps(extraction_data))
 
+        # Create resolution file (pass-through)
+        resolver_dir = tmp_path / "sessions" / "resolver"
+        resolver_dir.mkdir(parents=True)
+        resolution_data = {
+            "session_number": 5,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "resolutions": {
+                "baron-aldric": "baron-aldric",
+                "thornwood": "thornwood",
+            },
+        }
+        resolution_file = resolver_dir / "session-005.json"
+        resolution_file.write_text(json.dumps(resolution_data))
+
         # Create target directory and marker file path
         session_dir = tmp_path / "entities" / "sessions" / "session-005"
         marker_file = session_dir / ".split_complete"
 
         # Create mock SCons nodes
-        source_node = MagicMock()
-        source_node.__str__ = MagicMock(return_value=str(extraction_file))
+        extraction_node = MagicMock()
+        extraction_node.__str__ = MagicMock(return_value=str(extraction_file))
+        resolution_node = MagicMock()
+        resolution_node.__str__ = MagicMock(return_value=str(resolution_file))
         target_node = MagicMock()
         target_node.__str__ = MagicMock(return_value=str(marker_file))
 
         # Run action
-        result = split_action([target_node], [source_node], env=None)
+        result = split_action(
+            [target_node], [extraction_node, resolution_node], env=None
+        )
 
         assert result == 0
         assert marker_file.exists()
@@ -335,18 +353,33 @@ class TestRegisterAction:
         extraction_file = extracted_dir / "session-005.json"
         extraction_file.write_text(json.dumps(extraction_data))
 
+        # Create resolution file (pass-through)
+        resolver_dir = tmp_path / "sessions" / "resolver"
+        resolver_dir.mkdir(parents=True)
+        resolution_data = {
+            "session_number": 5,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "resolutions": {"baron-aldric": "baron-aldric"},
+        }
+        resolution_file = resolver_dir / "session-005.json"
+        resolution_file.write_text(json.dumps(resolution_data))
+
         # Create marker file path
         marker_dir = tmp_path / "entities" / "sessions" / "session-005"
         marker_file = marker_dir / ".register_complete"
 
         # Create mock SCons nodes
-        source_node = MagicMock()
-        source_node.__str__ = MagicMock(return_value=str(extraction_file))
+        extraction_node = MagicMock()
+        extraction_node.__str__ = MagicMock(return_value=str(extraction_file))
+        resolution_node = MagicMock()
+        resolution_node.__str__ = MagicMock(return_value=str(resolution_file))
         target_node = MagicMock()
         target_node.__str__ = MagicMock(return_value=str(marker_file))
 
         # Run action
-        result = register_action([target_node], [source_node], env=None)
+        result = register_action(
+            [target_node], [extraction_node, resolution_node], env=None
+        )
 
         assert result == 0
         assert marker_file.exists()
@@ -404,18 +437,33 @@ class TestRegisterAction:
         extraction_file = extracted_dir / "session-010.json"
         extraction_file.write_text(json.dumps(extraction_data))
 
+        # Create resolution file (pass-through)
+        resolver_dir = tmp_path / "sessions" / "resolver"
+        resolver_dir.mkdir(parents=True)
+        resolution_data = {
+            "session_number": 10,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "resolutions": {"baron-aldric": "baron-aldric"},
+        }
+        resolution_file = resolver_dir / "session-010.json"
+        resolution_file.write_text(json.dumps(resolution_data))
+
         # Create marker file path
         marker_dir = tmp_path / "entities" / "sessions" / "session-010"
         marker_file = marker_dir / ".register_complete"
 
         # Create mock SCons nodes
-        source_node = MagicMock()
-        source_node.__str__ = MagicMock(return_value=str(extraction_file))
+        extraction_node = MagicMock()
+        extraction_node.__str__ = MagicMock(return_value=str(extraction_file))
+        resolution_node = MagicMock()
+        resolution_node.__str__ = MagicMock(return_value=str(resolution_file))
         target_node = MagicMock()
         target_node.__str__ = MagicMock(return_value=str(marker_file))
 
         # Run action
-        result = register_action([target_node], [source_node], env=None)
+        result = register_action(
+            [target_node], [extraction_node, resolution_node], env=None
+        )
 
         assert result == 0
 
@@ -464,18 +512,33 @@ class TestRegisterAction:
         extraction_file = extracted_dir / "session-005.json"
         extraction_file.write_text(json.dumps(extraction_data))
 
+        # Create resolution file (empty, no entities)
+        resolver_dir = tmp_path / "sessions" / "resolver"
+        resolver_dir.mkdir(parents=True)
+        resolution_data = {
+            "session_number": 5,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "resolutions": {},
+        }
+        resolution_file = resolver_dir / "session-005.json"
+        resolution_file.write_text(json.dumps(resolution_data))
+
         # Create marker file path
         marker_dir = tmp_path / "entities" / "sessions" / "session-005"
         marker_file = marker_dir / ".register_complete"
 
         # Create mock SCons nodes
-        source_node = MagicMock()
-        source_node.__str__ = MagicMock(return_value=str(extraction_file))
+        extraction_node = MagicMock()
+        extraction_node.__str__ = MagicMock(return_value=str(extraction_file))
+        resolution_node = MagicMock()
+        resolution_node.__str__ = MagicMock(return_value=str(resolution_file))
         target_node = MagicMock()
         target_node.__str__ = MagicMock(return_value=str(marker_file))
 
         # Run action
-        result = register_action([target_node], [source_node], env=None)
+        result = register_action(
+            [target_node], [extraction_node, resolution_node], env=None
+        )
 
         assert result == 0
 

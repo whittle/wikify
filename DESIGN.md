@@ -17,16 +17,18 @@ Manually maintaining a wiki is tedious and falls out of sync. This system uses L
 
 ### Separation of Concerns
 
-The pipeline has five distinct phases with clear boundaries:
+The pipeline has six distinct phases with clear boundaries:
 
-1. **Extraction (LLM)**: Session notes → structured facts
-2. **Split (mechanical)**: Extraction → per-entity-per-session data files
-3. **Register (mechanical)**: Extraction → updated entity registry
-4. **Merge (mechanical)**: Entity-session files → per-entity data files
-5. **Rendering (LLM)**: Entity data → wiki articles (on-demand generation)
+1. **Extract (LLM)**: Session notes → structured facts + pass-through resolution
+2. **Resolve (editable)**: Maps extracted entity_ids to resolved entity_ids
+3. **Split (mechanical)**: Resolved extraction → per-entity-per-session data files
+4. **Register (mechanical)**: Resolved extraction → updated entity registry
+5. **Merge (mechanical)**: Entity-session files → per-entity data files
+6. **Render (LLM)**: Entity data → wiki articles (on-demand generation)
 
 This separation means:
 - Session extractions are immutable snapshots with full provenance
+- Resolution files enable correcting entity_id mistakes without re-extraction
 - Entity-session files capture each entity's data from one session
 - Entity data files can be regenerated at any time by merging entity-session files
 - Articles can be re-rendered with different styles without re-extraction
@@ -92,6 +94,9 @@ No need to reprocess the entire corpus for routine updates.
       session-007.txt        # Only sessions needing disambiguation
     /extracted/              # LLM-extracted facts
       session-001.json
+      session-002.json
+    /resolver/               # Entity ID resolution (editable)
+      session-001.json       # Maps extracted IDs → resolved IDs
       session-002.json
   /entities/
     /sessions/               # Per-entity-per-session data (generated)
@@ -169,6 +174,38 @@ Each `/sessions/extracted/session-{NNN}.json`:
 ```
 
 The `registry_commit` field records which version of the entity registry was used for this extraction, enabling full provenance tracking.
+
+### Session Resolution Format
+
+Each `/sessions/resolver/session-{NNN}.json`:
+
+```json
+{
+  "session_number": 12,
+  "generated_at": "2025-02-25T14:30:00Z",
+  "resolutions": {
+    "baron-aldric": "baron-aldric",
+    "king-aldren": "king-aldren",
+    "the-sunken-library": "the-sunken-library",
+    "lake-veris": "lake-veris"
+  }
+}
+```
+
+Resolution files are generated automatically during extraction as pass-through mappings (each entity_id maps to itself). They can be edited to:
+
+- **Correct typos**: `"baron-aldrich": "baron-aldric"` — fix misspellings
+- **Merge duplicates**: `"mont-tambora": "mount-tambora"` — consolidate entities the LLM extracted with different IDs
+- **Exclude non-entities**: `"the-party": null` — remove items that shouldn't be tracked as entities
+
+N.B. **Missing keys**: Every `entity_id` in the extraction must have a corresponding key; use `null` to intentionally exclude an `entity_id`.
+
+When split/register runs, it loads both the extraction and resolution files, translating all entity_ids through the resolution before processing. This enables correcting extraction mistakes without re-running the LLM.
+
+Resolution values:
+- **Same as key**: Pass-through, no change (default)
+- **Different string**: Remap to a different entity_id
+- **null**: Exclude this entity from aggregation entirely
 
 ### Fact Schema
 
@@ -329,6 +366,7 @@ SCons was chosen over Make because:
          ▼                                 ▼                                 ▼
 ┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
 │session-001.json │               │session-002.json │               │session-003.json │
+│ + resolver/     │               │ + resolver/     │               │ + resolver/     │
 └────────┬────────┘               └────────┬────────┘               └────────┬────────┘
          │                                 │                                 │
          ▼                                 ▼                                 ▼
@@ -354,6 +392,10 @@ SCons was chosen over Make because:
           │ baron-aldric.md │    │  thornwood.md   │    │ king-aldren.md  │
           └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+Note: Resolution files (`resolved/session-NNN.json`) are generated during extraction as
+pass-through mappings. They can be edited to correct entity_id mistakes. Changes to
+resolution files trigger rebuild of split/register/merge for that session.
 
 ### The Registry Dependency
 
@@ -384,9 +426,9 @@ This means:
 
 | Builder | Input | Output | Notes |
 |---------|-------|--------|-------|
-| `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` | LLM call, sequential |
-| `SplitSession` | `session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, outputs SessionEntityFacts |
-| `RegisterEntities` | `session-NNN.json` | `entity-registry.json` | Mechanical, updates registry |
+| `ExtractSession` | `session-NNN.txt` + registry | `session-NNN.json` + `resolved/session-NNN.json` | LLM call, sequential |
+| `SplitSession` | `session-NNN.json` + `resolved/session-NNN.json` | `entities/sessions/session-NNN/*.json` | Mechanical, outputs SessionEntityFacts |
+| `RegisterEntities` | `session-NNN.json` + `resolved/session-NNN.json` | `entity-registry.json` | Mechanical, updates registry |
 | `MergeEntity` | `entities/sessions/*/entity-id.json` + registry | `entities/data/entity-id.json` | Mechanical, outputs EntityData |
 | `RenderArticle` | `entity-name.json` | `entity-name.md` | LLM call, parallel |
 
@@ -524,7 +566,9 @@ Information in RPGs gets retconned, misremembered, or deliberately falsified by 
 
 **Process**: LLM extracts structured facts, resolving contextual references
 
-**Output**: Session extraction JSON file with provenance metadata
+**Output**:
+- Session extraction JSON file with provenance metadata
+- Pass-through resolution file (generated as side effect)
 
 The extraction prompt provides the current entity registry (canonical names and aliases) so the LLM can resolve references to existing entities. New entities are flagged with `is_new: true`.
 
@@ -533,34 +577,46 @@ The extraction must run against a clean, committed registry. The output records:
 - `extractor_version`: Version of the extraction prompt/tooling
 - `extracted_at`: Timestamp
 
+The extraction builder also generates a pass-through resolution file at `sessions/resolver/session-{NNN}.json`. This file maps each entity_id to itself (identity mapping) and can be edited to correct mistakes without re-extraction.
+
 ### Phase 2a: Split
 
-**Input**: Session extraction file
+**Input**: Session extraction file + resolution file
 
 **Process**: Mechanical split (no LLM)
 
 **Output**: Per-entity-per-session data files in `entities/sessions/session-NNN/`
 
-For each entity referenced in the extraction's facts (as subject or object):
+The split step first loads both the extraction and resolution files, producing a `ResolvedExtraction` with all entity_ids translated through the resolution. This enables correcting entity_id mistakes without re-extraction.
+
+For each entity referenced in the resolved extraction's facts (as subject or object):
 1. Collect facts where `subject_entity` matches the entity
 2. Collect `referenced_by` entries from facts where this entity appears in `object_entities`
 3. Write entity-session file as `entities/sessions/session-NNN/{entity-id}.json`
 
 Each entity-session file contains a `SessionEntityFacts` object — just facts and references, no entity metadata. This means split doesn't need access to the registry and naturally handles facts about entities that already exist.
 
+Resolution translation:
+- If resolution maps `old-id` → `new-id`, facts use `new-id` and file is named `new-id.json`
+- If resolution maps `id` → `null`, the entity is excluded from split output
+- If multiple extracted IDs resolve to the same target, their entities are merged (aliases combined, min first_appearance)
+- If an entity_id is missing from the resolution map, aggregation fails with `KeyError`
+
 ### Phase 2b: Register
 
-**Input**: Session extraction file
+**Input**: Session extraction file + resolution file
 
 **Process**: Mechanical registry update (no LLM)
 
 **Output**: Updated `entity-registry.json`
 
-For each entity discovered in the extraction:
-1. If the entity_id is new, add it to the registry
-2. If the entity_id exists, merge the new data (union aliases, use minimum first_appearance)
+The register step first loads both the extraction and resolution files, producing a `ResolvedExtraction` with all entity_ids translated through the resolution.
 
-This enables "Session N benefits from entities discovered in sessions 1 through N-1" by automatically propagating discovered entities to the registry.
+For each entity discovered in the resolved extraction:
+1. If the resolved entity_id is new, add it to the registry
+2. If the resolved entity_id exists, merge the new data (union aliases, use minimum first_appearance)
+
+This enables "Session N benefits from entities discovered in sessions 1 through N-1" by automatically propagating discovered entities to the registry. Resolution ensures that corrected entity_ids are registered under their canonical form.
 
 ### Phase 2c: Merge
 
@@ -634,12 +690,21 @@ Natural language hints work better than structured formats (like YAML front-matt
 
 ### Entity Merging
 
-When two entities are discovered to be the same:
+When two entities are discovered to be the same, there are two approaches:
+
+**Via Resolution (no registry change)**:
+1. Edit resolution files for affected sessions: `"old-entity-id": "canonical-entity-id"`
+2. Re-run aggregation (facts consolidate under the canonical entity)
+3. Re-render affected articles
+
+This preserves the original extractions and doesn't require updating the registry.
+
+**Via Registry (permanent change)**:
 1. Update registry: merge aliases, keep one canonical name
 2. Re-run aggregation (facts automatically consolidate under the surviving entity)
 3. Re-render affected articles
 
-No re-extraction required — the original extractions remain valid, and aggregation handles the merge.
+Use resolution for ad-hoc corrections; use registry for permanent entity definitions.
 
 ### Category Expansion
 

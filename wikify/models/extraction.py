@@ -35,3 +35,26 @@ class ExtractionResult(BaseModel):
     context_resolutions: list[ContextResolution]
     entities: list[ExtractedEntity]
     facts: list[Fact]
+
+    def collect_entity_ids(self) -> set[str]:
+        """Collect all entity_ids referenced in this extraction.
+
+        Includes:
+        - entities[*].entity_id (discovered entities)
+        - facts[*].subject_entity
+        - facts[*].object_entities
+        - context_resolutions[*].resolved_to
+        """
+        ids: set[str] = set()
+
+        for entity in self.entities:
+            ids.add(entity.entity_id)
+
+        for fact in self.facts:
+            ids.add(fact.subject_entity)
+            ids.update(fact.object_entities)
+
+        for resolution in self.context_resolutions:
+            ids.add(resolution.resolved_to)
+
+        return ids

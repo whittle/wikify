@@ -1,9 +1,14 @@
 """Data models for the Wikify pipeline."""
 
 from .entity import Entity, EntityData, SessionEntityFacts
-from .extraction import ContextResolution, ExtractedEntity, ExtractionResult
+from .extraction import (
+    ContextResolution,
+    ExtractedEntity,
+    ExtractionResult,
+)
 from .fact import AggregatedFact, ConfidenceLevel, Fact, Reference
 from .registry import Registry
+from .resolution import ResolvedExtraction, SessionResolution
 
 __all__ = [
     "AggregatedFact",
@@ -16,5 +21,7 @@ __all__ = [
     "Fact",
     "Reference",
     "Registry",
+    "ResolvedExtraction",
     "SessionEntityFacts",
+    "SessionResolution",
 ]

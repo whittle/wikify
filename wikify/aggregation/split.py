@@ -2,9 +2,9 @@
 
 from wikify.models import (
     AggregatedFact,
-    ExtractionResult,
     Fact,
     Reference,
+    ResolvedExtraction,
     SessionEntityFacts,
 )
 
@@ -28,7 +28,7 @@ def reference_fact(fact: Fact, session_num: int) -> Reference:
 
 
 def extract_facts_about_entity(
-    extraction: ExtractionResult, entity_id: str
+    extraction: ResolvedExtraction, entity_id: str
 ) -> list[AggregatedFact]:
     return [
         aggregate_fact(a, extraction.session_number)
@@ -38,7 +38,7 @@ def extract_facts_about_entity(
 
 
 def extract_references_to_entity(
-    extraction: ExtractionResult, entity_id: str
+    extraction: ResolvedExtraction, entity_id: str
 ) -> list[Reference]:
     return [
         reference_fact(a, extraction.session_number)
@@ -48,7 +48,7 @@ def extract_references_to_entity(
 
 
 def session_facts_for_entity(
-    extraction: ExtractionResult, entity_id: str
+    extraction: ResolvedExtraction, entity_id: str
 ) -> SessionEntityFacts:
     """Create SessionEntityFacts for an entity from this session."""
     return SessionEntityFacts(
@@ -58,7 +58,7 @@ def session_facts_for_entity(
     )
 
 
-def all_session_facts(extraction: ExtractionResult) -> list[SessionEntityFacts]:
+def all_session_facts(extraction: ResolvedExtraction) -> list[SessionEntityFacts]:
     """Get SessionEntityFacts for all entities referenced in this session's facts."""
     entity_ids: set[str] = set()
     for fact in extraction.facts:

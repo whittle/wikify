@@ -6,9 +6,10 @@ from typing import Any
 
 from wikify.aggregation.errors import EntityMismatchError, EntityNotFoundError
 from wikify.aggregation.merge import merge_session_facts
+from wikify.aggregation.resolve import load_resolved_extraction
 from wikify.aggregation.split import all_session_facts
 from wikify.git.registry import get_data_repo_path
-from wikify.models import Entity, ExtractionResult, Registry, SessionEntityFacts
+from wikify.models import Entity, Registry, SessionEntityFacts
 
 
 def parse_session_number_from_json(filename: str) -> int:
@@ -34,20 +35,21 @@ def split_action(target: list[Any], source: list[Any], env: Any) -> int:
 
     Args:
         target: List of target nodes (marker file .split_complete)
-        source: List of source nodes (input extraction JSON file)
+        source: List of source nodes [extraction JSON, resolution JSON]
         env: SCons environment
 
     Returns:
         0 on success, non-zero on failure
     """
-    source_path = Path(str(source[0]))
+    extraction_path = Path(str(source[0]))
+    resolution_path = Path(str(source[1]))
     target_path = Path(str(target[0]))
 
-    # Load extraction result
-    extraction = ExtractionResult.model_validate_json(source_path.read_text())
+    # Load and resolve extraction
+    resolved = load_resolved_extraction(extraction_path, resolution_path)
 
     # Get all session facts for this session
-    session_facts_list = all_session_facts(extraction)
+    session_facts_list = all_session_facts(resolved)
 
     # Create target directory (parent of the marker file)
     target_dir = target_path.parent
@@ -108,25 +110,26 @@ def register_action(target: list[Any], source: list[Any], env: Any) -> int:
 
     Args:
         target: List of target nodes (marker file .register_complete)
-        source: List of source nodes (input extraction JSON file)
+        source: List of source nodes [extraction JSON, resolution JSON]
         env: SCons environment
 
     Returns:
         0 on success, non-zero on failure
     """
-    source_path = Path(str(source[0]))
+    extraction_path = Path(str(source[0]))
+    resolution_path = Path(str(source[1]))
     target_path = Path(str(target[0]))
 
-    extraction = ExtractionResult.model_validate_json(source_path.read_text())
+    resolved = load_resolved_extraction(extraction_path, resolution_path)
 
-    if extraction.entities:
+    if resolved.entities:
         registry_path = get_data_repo_path() / "entity-registry.json"
         if registry_path.exists():
             registry = Registry.model_validate_json(registry_path.read_text())
         else:
             registry = Registry()
 
-        for extracted in extraction.entities:
+        for extracted in resolved.entities:
             entity = Entity(
                 canonical_name=extracted.canonical_name,
                 aliases=extracted.aliases,

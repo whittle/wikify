@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -14,9 +12,9 @@ from wikify.aggregation.split import (
 from wikify.models import (
     AggregatedFact,
     ExtractedEntity,
-    ExtractionResult,
     Fact,
     Reference,
+    ResolvedExtraction,
     SessionEntityFacts,
 )
 
@@ -92,7 +90,7 @@ class TestExtractFactsAboutEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 entities=st.permutations(entities),
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
@@ -125,7 +123,7 @@ class TestExtractFactsAboutEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 entities=st.permutations(entities),
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
@@ -174,7 +172,7 @@ class TestExtractReferencesToEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 entities=st.permutations(entities),
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
@@ -214,7 +212,7 @@ class TestExtractReferencesToEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 entities=st.permutations(entities),
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
@@ -234,7 +232,7 @@ class TestExtractReferencesToEntity:
 
 
 class TestSessionFactsForEntity:
-    @given(st.builds(ExtractionResult), st.text())
+    @given(st.builds(ResolvedExtraction), st.text())
     def test_entity_id_identity(self, extraction_result, entity_id):
         result: SessionEntityFacts = session_facts_for_entity(
             extraction_result, entity_id
@@ -253,7 +251,7 @@ class TestSessionFactsForEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
         )
@@ -282,7 +280,7 @@ class TestSessionFactsForEntity:
         )
         extraction = data.draw(
             st.builds(
-                ExtractionResult,
+                ResolvedExtraction,
                 facts=st.permutations(relevant_facts + irrelevant_facts),
             )
         )
@@ -298,7 +296,7 @@ class TestAllSessionFacts:
         """All subject entities from facts should get a SessionEntityFacts."""
         facts = data.draw(st.lists(st.builds(Fact), min_size=1))
         extraction = data.draw(
-            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+            st.builds(ResolvedExtraction, facts=st.just(facts), entities=st.just([]))
         )
 
         result: list[SessionEntityFacts] = all_session_facts(extraction)
@@ -312,7 +310,7 @@ class TestAllSessionFacts:
         """All object entities from facts should get a SessionEntityFacts."""
         facts = data.draw(st.lists(st.builds(Fact), min_size=1))
         extraction = data.draw(
-            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+            st.builds(ResolvedExtraction, facts=st.just(facts), entities=st.just([]))
         )
 
         result: list[SessionEntityFacts] = all_session_facts(extraction)
@@ -335,7 +333,7 @@ class TestAllSessionFacts:
             )
         )
         extraction = data.draw(
-            st.builds(ExtractionResult, facts=st.just(facts), entities=st.just([]))
+            st.builds(ResolvedExtraction, facts=st.just(facts), entities=st.just([]))
         )
 
         result: list[SessionEntityFacts] = all_session_facts(extraction)
@@ -345,12 +343,8 @@ class TestAllSessionFacts:
 
     def test_empty_extraction(self):
         """An extraction with no facts should produce no SessionEntityFacts."""
-        extraction = ExtractionResult(
+        extraction = ResolvedExtraction(
             session_number=1,
-            extracted_at=datetime.fromisoformat("2024-01-01T00:00:00"),
-            registry_commit="abc123",
-            extractor_version="1.0",
-            context_resolutions=[],
             entities=[],
             facts=[],
         )

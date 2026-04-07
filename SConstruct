@@ -97,31 +97,37 @@ if session_num is not None:
     extraction = env.Extract(str(extraction_target), str(raw_source))
     env.Depends(extraction, str(registry_path))
 
-    # Split (depends on extraction)
+    # Resolution file (generated as side effect of extraction)
+    resolution_file = data_path / "sessions" / "resolver" / f"session-{session_num:03d}.json"
+
+    # Split (depends on extraction and resolution)
     split_marker = sessions_dir / f"session-{session_num:03d}" / ".split_complete"
-    split = env.Split(str(split_marker), str(extraction_target))
+    split = env.Split(str(split_marker), [str(extraction_target), str(resolution_file)])
     env.Depends(split, extraction)
 
-    # Register (depends on extraction)
+    # Register (depends on extraction and resolution)
     register_marker = sessions_dir / f"session-{session_num:03d}" / ".register_complete"
-    register = env.Register(str(register_marker), str(extraction_target))
+    register = env.Register(str(register_marker), [str(extraction_target), str(resolution_file)])
     env.Depends(register, extraction)
 
 # Create split and register targets for all extracted sessions
 all_split_targets = []
 all_register_targets = []
 extracted_dir = data_path / "sessions" / "extracted"
+resolver_dir = data_path / "sessions" / "resolver"
 if extracted_dir.exists():
     for num, extraction_path in discover_extracted_sessions(extracted_dir):
         # Skip if this session was already set up via --session
         if session_num and num == session_num:
             continue
+        resolution_path = resolver_dir / f"session-{num:03d}.json"
+
         split_marker = sessions_dir / f"session-{num:03d}" / ".split_complete"
-        split = env.Split(str(split_marker), str(extraction_path))
+        split = env.Split(str(split_marker), [str(extraction_path), str(resolution_path)])
         all_split_targets.append(split)
 
         register_marker = sessions_dir / f"session-{num:03d}" / ".register_complete"
-        register = env.Register(str(register_marker), str(extraction_path))
+        register = env.Register(str(register_marker), [str(extraction_path), str(resolution_path)])
         all_register_targets.append(register)
 
 # Always set up merge targets for existing split outputs
